@@ -9,12 +9,12 @@ const { linuxArtifactNames, assertUnpublishedLinuxArtifact, publishLinuxArtifact
 
 test('Linux builder architecture names map explicitly to the trusted release identity on both ABIs', () => {
   const mappings = [
-    ['x64', 'AppImage', 'KAMUCL-1.1.11-linux-x86_64.AppImage', 'KAMUCL-1.1.11-linux-x64.AppImage'],
-    ['x64', 'deb', 'KAMUCL-1.1.11-linux-amd64.deb', 'KAMUCL-1.1.11-linux-x64.deb'],
-    ['x64', 'tar.gz', 'KAMUCL-1.1.11-linux-x64.tar.gz', 'KAMUCL-1.1.11-linux-x64.tar.gz'],
-    ['arm64', 'AppImage', 'KAMUCL-1.1.11-linux-arm64.AppImage', 'KAMUCL-1.1.11-linux-arm64.AppImage'],
-    ['arm64', 'deb', 'KAMUCL-1.1.11-linux-arm64.deb', 'KAMUCL-1.1.11-linux-arm64.deb'],
-    ['arm64', 'tar.gz', 'KAMUCL-1.1.11-linux-arm64.tar.gz', 'KAMUCL-1.1.11-linux-arm64.tar.gz']
+    ['x64', 'AppImage', 'MC-Launcher-1.1.11-linux-x86_64.AppImage', 'MC-Launcher-1.1.11-linux-x64.AppImage'],
+    ['x64', 'deb', 'MC-Launcher-1.1.11-linux-amd64.deb', 'MC-Launcher-1.1.11-linux-x64.deb'],
+    ['x64', 'tar.gz', 'MC-Launcher-1.1.11-linux-x64.tar.gz', 'MC-Launcher-1.1.11-linux-x64.tar.gz'],
+    ['arm64', 'AppImage', 'MC-Launcher-1.1.11-linux-arm64.AppImage', 'MC-Launcher-1.1.11-linux-arm64.AppImage'],
+    ['arm64', 'deb', 'MC-Launcher-1.1.11-linux-arm64.deb', 'MC-Launcher-1.1.11-linux-arm64.deb'],
+    ['arm64', 'tar.gz', 'MC-Launcher-1.1.11-linux-arm64.tar.gz', 'MC-Launcher-1.1.11-linux-arm64.tar.gz']
   ]
   for (const [arch, target, builderName, releaseName] of mappings) {
     const names = linuxArtifactNames('1.1.11', arch, target)

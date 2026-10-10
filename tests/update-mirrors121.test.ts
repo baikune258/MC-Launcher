@@ -35,7 +35,7 @@ function rangeResponse(req: http.IncomingMessage, res: http.ServerResponse, body
 }
 
 test('update source preferences retain presets, append normalized legacy/new mirrors and exclude unsafe prefixes', () => {
-  const asset = 'https://github.com/kamubaba-i/KAMUCL/releases/download/v1.1.20/KAMUCL-1.1.20.exe'
+  const asset = 'https://github.com/baikune258/MC-Launcher/releases/download/v1.1.20/MC-Launcher-1.1.20.exe'
   const settings = { updateMirrorUrl: 'https://legacy.example/proxy', updateMirrorUrls: [' https://custom.example ', 'https://ghproxy.net/', 'http://plain.example/', 'https://user:pass@example.org/', 'https://example.org/?token=x'] }
   const mirrors = [...UPDATE_MIRROR_PRESETS.map(prefix => prefix + asset), 'https://legacy.example/proxy/' + asset, 'https://custom.example/' + asset]
   assert.deepEqual(updateDownloadCandidates(asset, settings), [asset, ...mirrors])
@@ -279,7 +279,7 @@ test('same-origin redirects preserve authorization and CF keys are recomputed on
 })
 
 test('checksum lookup cancellation propagates before probes or useful transfer', async () => {
-  const controller = new AbortController(), hint = 'https://github.com/kamubaba-i/KAMUCL/releases/download/v1.1.20/KAMUCL-1.1.20.exe'
+  const controller = new AbortController(), hint = 'https://github.com/baikune258/MC-Launcher/releases/download/v1.1.20/MC-Launcher-1.1.20.exe'
   let calls = 0
   const pending = fetchSha256Sums(hint, async (_url, _etag, signal) => {
     calls++
@@ -291,20 +291,20 @@ test('checksum lookup cancellation propagates before probes or useful transfer',
 })
 
 test('official exact-release API digest permits verified mirror transfer when the checksum CDN is unavailable', async () => {
-  const hint = 'https://github.com/kamubaba-i/KAMUCL/releases/download/v1.1.20/KAMUCL-1.1.20.exe', calls: string[] = []
+  const hint = 'https://github.com/baikune258/MC-Launcher/releases/download/v1.1.20/MC-Launcher-1.1.20.exe', calls: string[] = []
   const digest = hash('official payload')
   const result = await fetchSha256Sums(hint, async url => {
     calls.push(url)
     if (url.endsWith('/SHA256SUMS.txt')) return new Response('unavailable', { status: 503 })
-    return Response.json({ tag_name: 'v1.1.20', assets: [{ name: 'KAMUCL-1.1.20.exe', browser_download_url: hint, size: 1024, digest: 'sha256:' + digest }] })
+    return Response.json({ tag_name: 'v1.1.20', assets: [{ name: 'MC-Launcher-1.1.20.exe', browser_download_url: hint, size: 1024, digest: 'sha256:' + digest }] })
   })
-  assert.equal(result?.get('KAMUCL-1.1.20.exe'), digest)
-  assert.deepEqual(calls, [hint.replace(/[^/]+$/, 'SHA256SUMS.txt'), 'https://api.github.com/repos/kamubaba-i/KAMUCL/releases/tags/v1.1.20'])
+  assert.equal(result?.get('MC-Launcher-1.1.20.exe'), digest)
+  assert.deepEqual(calls, [hint.replace(/[^/]+$/, 'SHA256SUMS.txt'), 'https://api.github.com/repos/baikune258/MC-Launcher/releases/tags/v1.1.20'])
 })
 
 test('API digest fallback rejects wrong release, wrong origin, invalid hash and unpublished assets', async () => {
-  const hint = 'https://github.com/kamubaba-i/KAMUCL/releases/download/v1.1.20/KAMUCL-1.1.20.exe'
-  const release = { tag_name: 'v1.1.20', assets: [{ name: 'KAMUCL-1.1.20.exe', browser_download_url: hint, size: 1024, digest: 'sha256:' + hash('official') }] }
+  const hint = 'https://github.com/baikune258/MC-Launcher/releases/download/v1.1.20/MC-Launcher-1.1.20.exe'
+  const release = { tag_name: 'v1.1.20', assets: [{ name: 'MC-Launcher-1.1.20.exe', browser_download_url: hint, size: 1024, digest: 'sha256:' + hash('official') }] }
   for (const changed of [
     { ...release, tag_name: 'v1.1.21' },
     { ...release, draft: true },
@@ -319,7 +319,7 @@ test('API digest fallback rejects wrong release, wrong origin, invalid hash and 
 })
 
 test('a stalled official API JSON body is cancelled by its own deadline after headers arrive', async () => {
-  const old = updateBodyPolicy.timeoutMs, hint = 'https://github.com/kamubaba-i/KAMUCL/releases/download/v1.1.20/KAMUCL-1.1.20.exe'
+  const old = updateBodyPolicy.timeoutMs, hint = 'https://github.com/baikune258/MC-Launcher/releases/download/v1.1.20/MC-Launcher-1.1.20.exe'
   let closed = false
   updateBodyPolicy.timeoutMs = 120
   try {
@@ -334,7 +334,7 @@ test('a stalled official API JSON body is cancelled by its own deadline after he
 })
 
 test('oversized official API JSON cannot provide a checksum and is closed before parsing', async () => {
-  const hint = 'https://github.com/kamubaba-i/KAMUCL/releases/download/v1.1.20/KAMUCL-1.1.20.exe'
+  const hint = 'https://github.com/baikune258/MC-Launcher/releases/download/v1.1.20/MC-Launcher-1.1.20.exe'
   let closed = false
   const result = await fetchSha256Sums(hint, async url => url.includes('/releases/tags/')
     ? new Response(new ReadableStream({ start(controller) { controller.enqueue(Buffer.alloc(updateBodyPolicy.maxBytes + 1, 32)) }, cancel() { closed = true } }))
@@ -344,7 +344,7 @@ test('oversized official API JSON cannot provide a checksum and is closed before
 })
 
 test('real HTTP API headers followed by a hung JSON body time out and close the socket', async () => {
-  const old = updateBodyPolicy.timeoutMs, hint = 'https://github.com/kamubaba-i/KAMUCL/releases/download/v1.1.20/KAMUCL-1.1.20.exe'
+  const old = updateBodyPolicy.timeoutMs, hint = 'https://github.com/baikune258/MC-Launcher/releases/download/v1.1.20/MC-Launcher-1.1.20.exe'
   let closed = false
   const s = await fixture((_req, res) => { res.on('close', () => { closed = true }); res.writeHead(200, { 'content-type': 'application/json' }); res.write('{"tag_name":"v1.1.20","assets":[') })
   updateBodyPolicy.timeoutMs = 120
@@ -357,7 +357,7 @@ test('real HTTP API headers followed by a hung JSON body time out and close the 
 })
 
 test('a paused API body consumes no active deadline; cancellation closes its pending read before returning', async () => {
-  const old = updateBodyPolicy.timeoutMs, hint = 'https://github.com/kamubaba-i/KAMUCL/releases/download/v1.1.20/KAMUCL-1.1.20.exe'
+  const old = updateBodyPolicy.timeoutMs, hint = 'https://github.com/baikune258/MC-Launcher/releases/download/v1.1.20/MC-Launcher-1.1.20.exe'
   let closed = false, started = false, settled = false
   const s = await fixture((_req, res) => { started = true; res.on('close', () => { closed = true }); res.writeHead(200, { 'content-type': 'application/json' }); res.write('{') })
   const task = registerTask('官方校验API正文暂停取消测试', 'download')

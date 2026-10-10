@@ -1,5 +1,6 @@
 import { app, BrowserWindow, crashReporter, shell, ipcMain, net, protocol, type BrowserWindowConstructorOptions } from 'electron'
 import { dirname, join } from 'node:path'
+import { mkdirSync, readdirSync, renameSync, rmSync, existsSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { createStartupSplash } from './startupSplash'
 import { prepareStartupFrames } from './startupRendering'
@@ -29,6 +30,14 @@ import { exitHistory, rememberExit } from './core/exitHistory'
 import { configureRuntimeGraphics } from './runtimeGraphics'
 import { resynchronizeWindowsRestore } from './windowRestoreVisibility'
 import { adaptiveWindowOptions, attachUiWindowSizing } from './uiWindowSizing'
+
+// 便携版数据跟随安装目录：userData 移到 EXE 旁的 MC-Launcher-data，不写系统盘；
+// 首次启动自动把旧 %APPDATA% 数据搬过来并清掉 C 盘残留（卸载 = 删除整个文件夹）。
+const PORTABLE_EXE = process.env.PORTABLE_EXECUTABLE_FILE
+const LEGACY_USER_DATA = app.getPath('userData')
+if (PORTABLE_EXE) {
+  try { app.setPath('userData', join(dirname(PORTABLE_EXE), 'MC-Launcher-data')) } catch (error) { console.warn('[MC-Launcher] userData 重定向失败', error) }
+}
 
 configureRuntimeGraphics(app.commandLine, process.platform, dirname(process.execPath))
 
@@ -200,6 +209,20 @@ function createWindow(startup?: Awaited<ReturnType<typeof createStartupSplash>>)
 
 app.whenReady().then(async () => {
   initializeLauncherLog()
+  // 便携版数据迁移：旧 %APPDATA% 数据搬入安装目录旁的新目录，随后清掉 C 盘残留（失败仅记日志，不打断启动）
+  if (PORTABLE_EXE && LEGACY_USER_DATA !== app.getPath('userData')) {
+    try {
+      const fresh = app.getPath('userData')
+      mkdirSync(fresh, { recursive: true })
+      if (existsSync(LEGACY_USER_DATA)) {
+        if (readdirSync(fresh).length === 0) {
+          for (const name of readdirSync(LEGACY_USER_DATA)) renameSync(join(LEGACY_USER_DATA, name), join(fresh, name))
+        }
+        rmSync(LEGACY_USER_DATA, { recursive: true, force: true })
+        launcherLogInfo('main', `已清理旧版 C 盘数据目录：${LEGACY_USER_DATA}`)
+      }
+    } catch (error) { launcherLogWarn('main', `旧数据迁移/清理跳过：${String(error).slice(0, 120)}`) }
+  }
   launcherLogInfo('main', `Electron 就绪（版本 ${app.getVersion()}）`)
   if (await applyUpdateOnStartup()) return
   const startup = await createStartupSplash()

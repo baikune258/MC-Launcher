@@ -14,9 +14,9 @@ import { fetchSha256Sums } from '../src/main/core/selfUpdate'
 
 const hash = (data: Buffer | string) => crypto.createHash('sha256').update(data).digest('hex')
 test('update checksum lookup stays on the selected release when latest changes', async () => {
-  const requested: string[] = [], hint = 'https://github.com/kamubaba-i/KAMUCL/releases/download/v1.0.77/KAMUCL-1.0.77.exe'
-  const sums = await fetchSha256Sums(hint, async url => { requested.push(url); return new Response(hash('77') + '  KAMUCL-1.0.77.exe') })
-  assert.equal(sums?.get('KAMUCL-1.0.77.exe'), hash('77'))
+  const requested: string[] = [], hint = 'https://github.com/baikune258/MC-Launcher/releases/download/v1.0.77/MC-Launcher-1.0.77.exe'
+  const sums = await fetchSha256Sums(hint, async url => { requested.push(url); return new Response(hash('77') + '  MC-Launcher-1.0.77.exe') })
+  assert.equal(sums?.get('MC-Launcher-1.0.77.exe'), hash('77'))
   assert.deepEqual(requested, [hint.replace(/[^/]+$/, 'SHA256SUMS.txt')])
   assert.equal(await fetchSha256Sums(hint, async url => url.endsWith('/latest')
     ? Response.json({ assets: [{ name: 'SHA256SUMS.txt', browser_download_url: 'https://example.com/SHA256SUMS.txt' }] })

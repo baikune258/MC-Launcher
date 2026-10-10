@@ -6,7 +6,7 @@ async function preflightFailure({ removeOut, finalizerFailure } = {}) {
   let spawned = 0, outReadyAtFailure = false
   const processFixture = { argv: ['node', 'script', arch, '--fixture-smoke'], platform: 'linux', arch, execPath: process.execPath, env: { DISPLAY: ':fixture' }, getuid: () => 1000 }
   try {
-    const release = path.join(root, 'release'), bytes = Buffer.from('synthetic preflight archive; never executed'), name = `KAMUCL-${version}-linux-${arch}.tar.gz`
+    const release = path.join(root, 'release'), bytes = Buffer.from('synthetic preflight archive; never executed'), name = `MC-Launcher-${version}-linux-${arch}.tar.gz`
     fs.mkdirSync(path.join(release, 'linux-proof-x64-packages'), { recursive: true }); fs.writeFileSync(path.join(release, name), bytes)
     fs.writeFileSync(path.join(release, 'linux-proof-x64-packages/summary.json'), JSON.stringify({ version, arch, sourceCommit: commit, packages: [{ name, bytes: bytes.length, sha256: crypto.createHash('sha256').update(bytes).digest('hex') }] }))
     const requireFixture = id => {

@@ -38,14 +38,14 @@ test('skip logic: skipped version not prompted, newer-than-skipped prompts again
 
 test('sha256 sums parser: standard sha256sum format', () => {
   const sums = parseSha256Sums(
-    'a'.repeat(64) + '  KAMUCL-1.0.14.exe\n' + 'b'.repeat(64) + ' *KAMUCL-1.0.14-windows-x64.zip\n'
+    'a'.repeat(64) + '  MC-Launcher-1.0.14.exe\n' + 'b'.repeat(64) + ' *MC-Launcher-1.0.14-windows-x64.zip\n'
   )
-  assert.equal(sums.get('KAMUCL-1.0.14.exe'), 'a'.repeat(64))
-  assert.equal(sums.get('KAMUCL-1.0.14-windows-x64.zip'), 'b'.repeat(64))
+  assert.equal(sums.get('MC-Launcher-1.0.14.exe'), 'a'.repeat(64))
+  assert.equal(sums.get('MC-Launcher-1.0.14-windows-x64.zip'), 'b'.repeat(64))
 })
 
 test('download candidates honor source setting: auto=direct+presets, direct only, mirror presets+custom', () => {
-  const url = 'https://github.com/x/KAMUCL-1.0.14.exe'
+  const url = 'https://github.com/x/MC-Launcher-1.0.14.exe'
   const auto = updateDownloadCandidates(url, { updateSource: 'auto', updateMirrorUrl: 'https://ghproxy.net/' })
   assert.deepEqual(auto, [url, ...UPDATE_MIRROR_PRESETS.map(prefix => prefix + url)])
   assert.deepEqual(updateDownloadCandidates(url, { updateSource: 'direct', updateMirrorUrl: '' }), [url])
