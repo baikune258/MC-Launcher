@@ -255,7 +255,7 @@ export function decideUpdateAction(opts: {
 }
 
 /** 品牌化起点版本：回退与历史列表的最低版本（2.0.0 起为自有品牌，排除原作者 1.x 版本） */
-export const ROLLBACK_MIN_VERSION = '2.0.0'
+export const ROLLBACK_MIN_VERSION = '1.1.22'
 
 /** 版本回退候选：品牌化后的正式 Release（含当前与更旧版本，按发布时间倒序；最低到 2.0.0） */
 export async function listReleases(): Promise<ReleaseInfo[]> {
