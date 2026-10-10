@@ -124,9 +124,17 @@ try {
       $ack = Get-Content -LiteralPath $receipt -Raw | ConvertFrom-Json
       if ($ack.id -eq ${q(t.id)} -and $ack.version -eq ${q(t.release.version)}) {
         Log 'Renderer startup receipt verified'
-        Move-Item -LiteralPath $claim -Destination ($claim + '.completed') -Force
+        Remove-Item -LiteralPath $receipt -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $claim -Force -ErrorAction SilentlyContinue
         if (-not (Test-Path -LiteralPath ${q(updateMarker(spec.oldExe))})) {
-          try { if ((Hash-File $newExe) -eq $expected) { Remove-Item -LiteralPath $newExe -Force } } catch { Log 'Staged package cleanup deferred' }
+          try {
+            if ((Hash-File $newExe) -eq $expected) {
+              Remove-Item -LiteralPath $newExe -Force -ErrorAction SilentlyContinue
+              # 更新包已应用，顺带清空暂存子目录（残留由下次启动兜底清理）
+              $pkgDir = Split-Path -Parent $newExe
+              if ((Test-Path -LiteralPath $pkgDir) -and -not (Get-ChildItem -LiteralPath $pkgDir -Force | Select-Object -First 1)) { Remove-Item -LiteralPath $pkgDir -Force -Recurse -ErrorAction SilentlyContinue }
+            }
+          } catch { Log 'Staged package cleanup deferred' }
         }
         exit 0
       }

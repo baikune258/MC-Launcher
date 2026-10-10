@@ -124,6 +124,48 @@ async function writePendingUpdate(release: ReleaseInfo, file: string, sha256: st
   atomicUpdateJson(marker, t)
   fs.rmSync(pendingFile(), { force: true })
 }
+
+/**
+ * 清理更新遗留物（仅在启动时执行一次，不阻断启动）：
+ * - EXE 旁的 .kamuclupdate* 残留标记（.completed / .receipt.json / .failed / .applying.failed / 无事务的 marker）
+ * - KAMUCL-update 中的残留下载包及空目录
+ * - KAMUCL-backup 只保留 update-state.json 指向的最新备份（回退功能仍可用），其余旧备份删除
+ * 调用时机：applyUpdateOnStartup 之后（此时活动事务已被消费或不存在），下载中不会发生。
+ */
+export function cleanupUpdateRemnants(): void {
+  if (process.platform !== 'win32') return
+  const exe = currentPortableExe()
+  if (!exe) return
+  const base = path.dirname(exe)
+  // 1. 更新标记残留
+  try {
+    for (const name of fs.readdirSync(base)) {
+      if (name.startsWith('.kamuclupdate')) {
+        try { fs.rmSync(path.join(base, name), { force: true }) } catch { /* 占用时留待下次 */ }
+      }
+    }
+  } catch { /* 目录不可读则跳过 */ }
+  // 2. KAMUCL-update 残留下载包与空目录
+  try { fs.rmSync(path.join(base, 'KAMUCL-update'), { recursive: true, force: true }) } catch { /* 跳过 */ }
+  // 3. KAMUCL-backup：只保留最新备份（回退依赖），其余旧备份删除
+  try {
+    const backupDir = path.join(base, 'KAMUCL-backup')
+    if (!fs.existsSync(backupDir)) return
+    const state = getUpdateState()
+    let keep = state ? path.basename(state.backupPath) : null
+    if (keep && !fs.existsSync(path.join(backupDir, keep))) keep = null
+    const entries = fs.readdirSync(backupDir).filter((n) => n.endsWith('.exe')).sort()
+    // 无可用备份记录时保守保留最近修改的一个
+    if (!keep && entries.length > 0) {
+      let latest = entries[0], latestMs = 0
+      for (const n of entries) { const ms = fs.statSync(path.join(backupDir, n)).mtimeMs; if (ms > latestMs) { latest = n; latestMs = ms } }
+      keep = latest
+    }
+    for (const n of entries) {
+      if (n !== keep) { try { fs.rmSync(path.join(backupDir, n), { force: true }) } catch { /* 跳过 */ } }
+    }
+  } catch { /* 清理失败不阻断启动 */ }
+}
 /** Suppress retrying a failed/unfinished transaction until the user explicitly downloads again. */
 export function blockedUpdateVersion(): string | undefined {
   if (process.platform === 'darwin') return blockedMacVersion()

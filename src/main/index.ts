@@ -230,6 +230,8 @@ app.whenReady().then(async () => {
   }
   launcherLogInfo('main', `Electron 就绪（版本 ${app.getVersion()}）`)
   if (await applyUpdateOnStartup()) return
+  // 启动时清理更新残留（标记文件/旧下载包/旧备份），保证软件目录干净
+  try { (await import('./core/applyUpdate')).cleanupUpdateRemnants() } catch { /* 忽略 */ }
   const startup = await createStartupSplash()
   launcherLogInfo('main', '启动闪屏已创建')
   // 内存压榨控制器：指标日志 + 静默期工作集整理（trim 进程清单来自 getAppMetrics，绝不触碰游戏进程）
