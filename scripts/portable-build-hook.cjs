@@ -2,12 +2,12 @@
 // 1. 未引用可执行文件路径——TEMP / 用户名含空格时 ExecWait 失败（退出码1），主进程尚未运行。
 // 2. 解压目录：模板优先走 "$TEMP\${UNPACK_DIR_NAME}"（unpackDirName 即使为 false 也会
 //    被 electron-builder 填成随机 ksuid），否则才落 $PLUGINSDIR\app——两条路径都在系统 TEMP，
-//    用户不可见且占用系统盘；统一改为解压到 exe 所在目录的固定子目录 KAMUCL-runtime
+//    用户不可见且占用系统盘；统一改为解压到 exe 所在目录的固定子目录 MC-Launcher-runtime
 //    缓存按完整构建内容隔离，完整解压后复用；首次解压前先显示轻量玻璃碎片。
 // 在构建时变换模板，不修改 node_modules；升级模板后无法识别则阻止错误出包。
 const OLD_UNPACK_PLUGINS = 'StrCpy $INSTDIR "$PLUGINSDIR\\app"'
 const OLD_UNPACK_TEMP = 'StrCpy $INSTDIR "$TEMP\\${UNPACK_DIR_NAME}"'
-const NEW_UNPACK = 'StrCpy $INSTDIR "$EXEDIR\\KAMUCL-runtime"'
+const NEW_UNPACK = 'StrCpy $INSTDIR "$EXEDIR\\MC-Launcher-runtime"'
 
 function repairPortableScript(script, options = {}) {
   if (script.includes('; KAMUCL_EARLY_FEEDBACK')) return script
@@ -21,7 +21,7 @@ function repairPortableScript(script, options = {}) {
   const old = 'ExecWait "$INSTDIR\\${APP_EXECUTABLE_FILENAME} $R0" $0'
   const fixed = `ExecWait '\"$INSTDIR\\\${APP_EXECUTABLE_FILENAME}\" $R0' $0`
   if (script.split(old).length !== 2) throw new Error('Portable NSIS template changed: review quoted launch command before release')
-  script = script.replace(old, `ClearErrors\n\t${fixed}\n\tIfErrors 0 +3\n\tMessageBox MB_OK|MB_ICONSTOP 'KAMUCL could not start. Please extract the Windows unpacked ZIP package and run KAMUCL.exe.'\n\tStrCpy $0 1\n  FileOpen $R8 "$PLUGINSDIR\\startup.done" w\n  FileClose $R8`)
+  script = script.replace(old, `ClearErrors\n\t${fixed}\n\tIfErrors 0 +3\n\tMessageBox MB_OK|MB_ICONSTOP 'MC-Launcher could not start. Please extract the Windows unpacked ZIP package and run MC-Launcher.exe.'\n\tStrCpy $0 1\n  FileOpen $R8 "$PLUGINSDIR\\startup.done" w\n  FileClose $R8`)
   const key = options.cacheKey || 'test-cache'
   const feedback = options.feedback || require('node:path').resolve(__dirname, '../out/main/StartupFeedback.exe')
   script = `; KAMUCL_EARLY_FEEDBACK\n!define KAMUCL_CACHE_KEY "${key}"\nVar runtimeMutex\n${script}`

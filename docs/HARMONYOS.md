@@ -1,6 +1,6 @@
 # 原生 HarmonyOS PC 接入与验收门槛
 
-目标是鸿蒙电脑（`2in1`）上的原生 KAMUCL，使用当前同一份业务代码、Vue 页面、Three 模型和动效资源。手机、平板、Android 兼容容器、Linux 虚拟机、远程游戏不属于本交付。
+目标是鸿蒙电脑（`2in1`）上的原生 MC-Launcher，使用当前同一份业务代码、Vue 页面、Three 模型和动效资源。手机、平板、Android 兼容容器、Linux 虚拟机、远程游戏不属于本交付。
 
 ## 当前状态
 
@@ -47,7 +47,7 @@ node scripts/build-harmonyos.cjs --check
 工程处理包括：
 
 - 清除维护方个人签名资料和路径，生成未签名 build-profile。
-- 设置 `com.kamucl.launcher`、当前版本、KAMUCL 图标和标签，仅面向 `2in1`。
+- 设置 `com.kamucl.launcher`、当前版本、MC-Launcher 图标和标签，仅面向 `2in1`。
 - 保留 ArkTS 原生窗口与重复启动的实际路由，移除模板的多应用实例声明。不会调用维护方明确不支持的 Electron 单实例锁接口。
 - 将相同生产 main、preload、renderer 原样复制，包含现有许可证文件；不复制 Windows/macOS/Linux 辅助执行文件或 Windows 专用 koffi 本机库。
 - 固定维护方 ArkTS adapter 的 inversify 6.0.1、reflect-metadata 0.1.13，实际 ohpm 安装后仍须保存并核查其完整依赖锁文件。
@@ -67,7 +67,7 @@ node scripts/build-harmonyos.cjs --check
 工具目录应包含 `bin/hvigorw.bat`（其他系统为 `hvigorw`）、ohpm 和 SDK。对已授权的安装路径设置：
 
 ```powershell
-$env:KAMUCL_HARMONY_COMMAND_LINE_TOOLS = 'D:\Tools\command-line-tools'
+$env:MC-Launcher_HARMONY_COMMAND_LINE_TOOLS = 'D:\Tools\command-line-tools'
 node scripts/build-harmonyos.cjs
 ```
 
@@ -90,6 +90,6 @@ Electron 的原生 HAP 能力不自动提供 Minecraft 的原生运行链。后�
 
 ## 后续验收与公开发布
 
-使用真实鸿蒙电脑记录三类主题、最小窗口与缩放下的功能截图、原始录屏和帧时间。覆盖皮肤绘制及关闭确认、卡慕互动和声音同步、导入、收藏、登录、文件授权、更新、托盘/焦点和实际游戏启动。分别记录真实服务与夹具结果，进行独立视觉、交互和动效评分；未经实际听测的音效单列未覆盖。
+使用真实鸿蒙电脑记录三类主题、最小窗口与缩放下的功能截图、原始录屏和帧时间。覆盖皮肤绘制及关闭确认、baikun互动和声音同步、导入、收藏、登录、文件授权、更新、托盘/焦点和实际游戏启动。分别记录真实服务与夹具结果，进行独立视觉、交互和动效评分；未经实际听测的音效单列未覆盖。
 
 补齐运行时第三方 notices、对应源码和许可后，才能生成可公开分发的签名 HAP。最终源码、工程、HAP、SHA256、设备/系统/SDK版本及原始失败记录应一致绑定最终提交；工程准备的成功不能代替这些验收。

@@ -8,14 +8,14 @@
         "phase": "cold",
         "firstPaintMs": 567,
         "electronEntryMs": 6651,
-        "cache": "C:\\Users\\ROG\\AppData\\Local\\Temp\\kamucl startup 中文-8elPww\\KAMUCL-runtime\\1.1.19-3b2241a4e94b87ac\\cache.ready",
+        "cache": "C:\\Users\\ROG\\AppData\\Local\\Temp\\kamucl startup 中文-8elPww\\MC-Launcher-runtime\\1.1.19-3b2241a4e94b87ac\\cache.ready",
         "cacheMtime": 1791361504557.1917
       },
       {
         "phase": "warm",
         "firstPaintMs": 394,
         "electronEntryMs": 268,
-        "cache": "C:\\Users\\ROG\\AppData\\Local\\Temp\\kamucl startup 中文-8elPww\\KAMUCL-runtime\\1.1.19-3b2241a4e94b87ac\\cache.ready",
+        "cache": "C:\\Users\\ROG\\AppData\\Local\\Temp\\kamucl startup 中文-8elPww\\MC-Launcher-runtime\\1.1.19-3b2241a4e94b87ac\\cache.ready",
         "cacheMtime": 1791361504557.1917
       }
     ]
@@ -28,19 +28,19 @@
         "phase": "cold",
         "firstPaintMs": 614,
         "electronEntryMs": 7526,
-        "cache": "C:\\Users\\ROG\\AppData\\Local\\Temp\\kamucl startup 中文-zh9FPq\\KAMUCL-runtime\\1.1.19-3b2241a4e94b87ac\\cache.ready",
+        "cache": "C:\\Users\\ROG\\AppData\\Local\\Temp\\kamucl startup 中文-zh9FPq\\MC-Launcher-runtime\\1.1.19-3b2241a4e94b87ac\\cache.ready",
         "cacheMtime": 1791361515327.8938
       },
       {
         "phase": "warm",
         "firstPaintMs": 492,
         "electronEntryMs": 353,
-        "cache": "C:\\Users\\ROG\\AppData\\Local\\Temp\\kamucl startup 中文-zh9FPq\\KAMUCL-runtime\\1.1.19-3b2241a4e94b87ac\\cache.ready",
+        "cache": "C:\\Users\\ROG\\AppData\\Local\\Temp\\kamucl startup 中文-zh9FPq\\MC-Launcher-runtime\\1.1.19-3b2241a4e94b87ac\\cache.ready",
         "cacheMtime": 1791361515327.8938
       }
     ]
   },
-  "zipRoot": "C:\\Users\\ROG\\AppData\\Local\\Temp\\KAMUCL ZIP 中文 TJ1LQD",
+  "zipRoot": "C:\\Users\\ROG\\AppData\\Local\\Temp\\MC-Launcher ZIP 中文 TJ1LQD",
   "files": [
     {
       "path": "chrome_100_percent.pak",
@@ -68,7 +68,7 @@
       "sha256": "9f48c7f9c7c94d516a14870707e910ab94d75ae640ff6842c4af53276cd26ebe"
     },
     {
-      "path": "KAMUCL.exe",
+      "path": "MC-Launcher.exe",
       "size": 246070784,
       "sha256": "ff1cab6c0180f360c1e9f76290f87f33defbfc73d343e4d1a0681dfffa66c476"
     },

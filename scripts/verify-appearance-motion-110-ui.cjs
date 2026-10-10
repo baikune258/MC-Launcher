@@ -32,7 +32,7 @@ module.exports=async({call,evaluate,main,nav,wait,screenshot,recordScreencast,ve
   await ready("document.querySelector('.viewer3d')?.dataset.animationState==='paused'",'action temporarily yields')
   assert.equal(Math.abs((await pose()).arm),0)
   await ready("document.querySelector('.viewer3d')?.dataset.animationState==='walk'",'action ends and skin resumes')
-  await coordinateClick('[aria-label="卡慕互动设置"]');await evaluate("[...document.querySelectorAll('.sound-panel button')].find(e=>e.textContent==='恢复 LOGO').click()")
+  await coordinateClick('[aria-label="baikun互动设置"]');await evaluate("[...document.querySelectorAll('.sound-panel button')].find(e=>e.textContent==='恢复 LOGO').click()")
   await ready("!document.querySelector('.mascot-stage')",'mascot close')
   proof.checks.push('opened idle mascot keeps skin walking; one actual click temporarily yields neutral pose and resumes after action')
   await call('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]})

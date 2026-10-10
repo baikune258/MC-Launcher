@@ -1,6 +1,6 @@
-# KAMUCL 开发指南
+# MC-Launcher 开发指南
 
-这份文档面向第一次参与 KAMUCL 开发的成员，目标是让你能快速启动项目、找到正确的代码层，并安全地提交一个功能改动。
+这份文档面向第一次参与 MC-Launcher 开发的成员，目标是让你能快速启动项目、找到正确的代码层，并安全地提交一个功能改动。
 
 本文适用于当前 Windows x64、Mac ARM64 共同代码基线。其他平台工程仍在仓库中，不代表本批交付或已经通过原生验收。
 
@@ -178,7 +178,7 @@ Bridge 只监听 `127.0.0.1`，通过游戏目录中的 `.kamucl-bridge.json` �
 
 ## 8. 数据目录与调试
 
-默认用户数据目录是 Windows 的 `%APPDATA%\KAMUCL`（macOS 为 `~/Library/Application Support/KAMUCL`），设置文件位于 Electron `userData` 目录下。开发调试时建议使用独立临时目录，避免污染个人账号和游戏实例。
+默认用户数据目录是 Windows 的 `%APPDATA%\MC-Launcher`（macOS 为 `~/Library/Application Support/MC-Launcher`），设置文件位于 Electron `userData` 目录下。开发调试时建议使用独立临时目录，避免污染个人账号和游戏实例。
 
 调试重点：
 
@@ -203,7 +203,7 @@ Bridge 只监听 `127.0.0.1`，通过游戏目录中的 `.kamucl-bridge.json` �
 
 成品须干净解压、启动、核对 ASAR 版本和附件 SHA256，源码须使用已提交的 Git 原始 blob。排除用户账号、配置、私钥、整合包、存档及无关文件；构建缓存和运行证据不直接整目录放入源码。标签显式绑定最终 master 提交；Release 发布后核对公开状态、标签、提交和全部附件的大小与哈希。
 
-项目许可字段为 `SEE LICENSE IN LICENSE`。原始 KAMUCL 贡献的 MIT 范围、第三方许可及源码条件分别见根目录 `LICENSE`、`THIRD_PARTY_NOTICES.md`、`licenses/` 和[对应源码说明](CORRESPONDING_SOURCE.md)。执行 `npm run license:check`，未解决许可来源时不能发布。
+项目许可字段为 `SEE LICENSE IN LICENSE`。原始 MC-Launcher 贡献的 MIT 范围、第三方许可及源码条件分别见根目录 `LICENSE`、`THIRD_PARTY_NOTICES.md`、`licenses/` 和[对应源码说明](CORRESPONDING_SOURCE.md)。执行 `npm run license:check`，未解决许可来源时不能发布。
 
 相关文档：
 

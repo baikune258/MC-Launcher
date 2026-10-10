@@ -101,7 +101,7 @@ export function startDirectHost(request: DirectHostRequest): Promise<DirectHostS
     try {
       const endpoints: DirectEndpoint[] = network.addresses.filter(item => item.kind !== 'ipv6' || ipv6Available).slice(0, 10).map(item => ({ host: item.address, port: forwarder.port, kind: item.kind }))
       const messages = [...network.messages, ...network.gateways.filter(item => /CGNAT|上级 NAT/.test(item.diagnosis)).map(item => item.diagnosis)]
-      const owner = `KAMUCL-${crypto.randomUUID().slice(0, 12)}`
+      const owner = `MC-Launcher-${crypto.randomUUID().slice(0, 12)}`
       if (request.useUpnp) {
         for (const gateway of gateways.filter(item => ipv4Scope(item.externalAddress) === 'public').slice(0, 2)) {
           signal.throwIfAborted()

@@ -1,4 +1,4 @@
-# KAMUCL 1.1.17 — Windows x64
+# MC-Launcher 1.1.17 — Windows x64
 
 2026-10-07 01:36（香港时间）
 
@@ -12,6 +12,6 @@
 
 附件为Windows便携EXE、紧凑ZIP、展开ZIP、源码、交接包及SHA256SUMS.txt。保留用户数据、历史计数和旧实例；本批没有Mac成品，资源占用优化仍暂停。
 
-验证：1284项中1283通过、0失败、1平台专属跳过；类型、许可、生产构建、完整Windows包及四类主题真实界面专项。分项独立评分和历史失败见[独立评审](https://github.com/kamubaba-i/KAMUCL/blob/v1.1.17/docs/validation-1.1.17/INDEPENDENT_REVIEW.md)。
+验证：1284项中1283通过、0失败、1平台专属跳过；类型、许可、生产构建、完整Windows包及四类主题真实界面专项。分项独立评分和历史失败见[独立评审](https://github.com/baikune258/MC-Launcher/blob/v1.1.17/docs/validation-1.1.17/INDEPENDENT_REVIEW.md)。
 
-真实官方服务验证仅中文检索元数据；MOD安装使用本地合成文件配合原生产下载/哈希/事务。真实Minecraft进入世界与窗口退出链、用户原0.0.0实例、物理1366×768主机、完整动效基准和人工听感未覆盖。Windows未做发行者签名。具体[验证范围](https://github.com/kamubaba-i/KAMUCL/blob/v1.1.17/docs/validation-1.1.17/README.md)和原始失败保留，不将夹具或分数冒称真实游戏通过。
+真实官方服务验证仅中文检索元数据；MOD安装使用本地合成文件配合原生产下载/哈希/事务。真实Minecraft进入世界与窗口退出链、用户原0.0.0实例、物理1366×768主机、完整动效基准和人工听感未覆盖。Windows未做发行者签名。具体[验证范围](https://github.com/baikune258/MC-Launcher/blob/v1.1.17/docs/validation-1.1.17/README.md)和原始失败保留，不将夹具或分数冒称真实游戏通过。

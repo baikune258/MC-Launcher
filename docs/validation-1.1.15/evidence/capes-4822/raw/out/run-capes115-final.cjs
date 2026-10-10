@@ -2,7 +2,7 @@
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict'),{spawn}=require('node:child_process')
 const hash=bytes=>crypto.createHash('sha256').update(bytes).digest('hex'),out=path.resolve('out'),binder=require('./receipt-capes115.cjs'),cim=require('./owned-cim115.cjs')
 const args=process.argv.slice(2);assert.equal(args[0],'--execute','Explicit execution and GUI ownership are required');const expected=args[1];assert(/^[a-f0-9]{64}$/.test(expected),'Pass the parent-frozen executable SHA')
-const application=path.resolve('release/KAMUCL-1.1.15.exe');assert.equal(hash(fs.readFileSync(application)),expected)
+const application=path.resolve('release/MC-Launcher-1.1.15.exe');assert.equal(hash(fs.readFileSync(application)),expected)
 const sources=path.resolve('out/qa-capes115-black-orange-f8d2f35a-e14f-458f-9462-308067c2c4be'),themes=args.slice(2).length?args.slice(2):['black-orange','blue-white','transparent','custom']
 assert(themes.every(theme=>['black-orange','blue-white','transparent','custom'].includes(theme)));assert.equal(new Set(themes).size,themes.length)
 const id=crypto.randomUUID(),directory=path.join(out,'acceptance-1.1.15','capes-final-'+id);fs.mkdirSync(directory,{recursive:true})
@@ -13,7 +13,7 @@ result.sources=['out/run-capes115-final.cjs','out/owned-cim115.cjs','out/receipt
 ;(async()=>{try{
  for(const theme of themes){
   assert.equal(hash(fs.readFileSync(application)),expected);const beforeDirs=new Set(list(name=>name.startsWith('qa-capes115-'+theme+'-'))),beforeOwned=new Set(list(name=>name.startsWith('qa-owned-process-119-')&&name.endsWith('.json'))),logFile=path.join(directory,theme+'.log'),log=fs.openSync(logFile,'wx')
-  const env={...process.env,KAMUCL_GUI_APP:application,KAMUCL_EXTENSION_GUI:'1',KAMUCL_EXTENSION_ONLY:'1',KAMUCL_SKIP_EXTENSION_BASE:'1',KAMUCL_UI_MODULE:'capes115',KAMUCL_CAPE_PUBLIC_FIXTURE_ROOT:sources};delete env.KAMUCL_GUI_DEV;delete env.KAMUCL_GUI_SOFTWARE;delete env.ELECTRON_RUN_AS_NODE
+  const env={...process.env,MC-Launcher_GUI_APP:application,MC-Launcher_EXTENSION_GUI:'1',MC-Launcher_EXTENSION_ONLY:'1',MC-Launcher_SKIP_EXTENSION_BASE:'1',MC-Launcher_UI_MODULE:'capes115',MC-Launcher_CAPE_PUBLIC_FIXTURE_ROOT:sources};delete env.MC-Launcher_GUI_DEV;delete env.MC-Launcher_GUI_SOFTWARE;delete env.ELECTRON_RUN_AS_NODE
   const run={theme,startedAt:new Date().toISOString(),complete:false,logFile};result.runs.push(run);save()
   const child=spawn(process.execPath,['scripts/verify-ui-refinement.cjs',theme],{cwd:path.resolve('.'),env,stdio:['ignore',log,log]});run.driverPid=child.pid;save()
   const seen=new Map();run.windowsOwnedSamples=[];let sampling=true

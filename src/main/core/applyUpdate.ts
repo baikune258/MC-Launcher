@@ -33,7 +33,7 @@ export function setUpdateEmitter(fn: Emitter): void { emit = fn }
 
 /**
  * 当前运行的便携 exe（外层启动器）路径。
- * 便携包运行时进程在 KAMUCL-runtime 内，外层 exe 由 electron-builder 注入 PORTABLE_EXECUTABLE_FILE；
+ * 便携包运行时进程在 MC-Launcher-runtime 内，外层 exe 由 electron-builder 注入 PORTABLE_EXECUTABLE_FILE；
  * 测试可用 KAMUCL_UPDATE_TARGET_EXE 指向沙盒副本走全链路。
  */
 export function currentPortableExe(): string | null {

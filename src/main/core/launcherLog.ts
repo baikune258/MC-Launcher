@@ -131,7 +131,7 @@ export function initializeLauncherLog(): string {
       currentLogPath,
       [
         divider,
-        `[${now.toISOString()}] KAMUCL ${app.getVersion()} session started (${process.platform} ${process.arch})`,
+        `[${now.toISOString()}] MC-Launcher ${app.getVersion()} session started (${process.platform} ${process.arch})`,
         `Electron ${process.versions.electron ?? '?'} / Node ${process.versions.node ?? '?'} / 日志级别下限 ${minimumLevel}`,
         divider
       ].join('\n') + '\n',

@@ -9,7 +9,7 @@ const { assertNativeHost, matrixPlan, validateManifest, rendererHashMap, validat
 const fixture = require('./qa-fixture-ui121.cjs')
 const { readMacPackageIdentity } = require('./mac-package-identity.cjs')
 
-const REPOSITORY = 'kamubaba-i/KAMUCL', REPOSITORY_ID = 1359309072
+const REPOSITORY = 'baikune258/MC-Launcher', REPOSITORY_ID = 1359309072
 const SOURCE = '8e29307b0eefa95d12dea948fab2002b7807854b', RUN = 37820579554, PACKAGE_JOB = 113460274229
 const ARTIFACT = { id: 11568754732, name: 'mac-packages-arm64', size_in_bytes: 260027091, digest: 'sha256:c1113626d40d6ce3af75ac1c4d14d55685e51526da2a9e202b6fb98fed2009ca' }
 const MANIFEST = 'd08f11007cfe20caa4d7cb6f4f4da7c8113623918f1356a5b908ed4c10ad7cec'

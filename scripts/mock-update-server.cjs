@@ -5,8 +5,8 @@
  *   node scripts/mock-update-server.cjs [port=8310]
  *
  * 提供：
- *   GET /repos/kamubaba-i/KAMUCL/releases/latest  → 伪造最新版 v99.0.0（资产指向本服务器）
- *   GET /repos/kamubaba-i/KAMUCL/releases         → 3 个历史版本（v99.0.0 / v1.0.0 / v0.9.9）
+ *   GET /repos/baikune258/MC-Launcher/releases/latest  → 伪造最新版 v99.0.0（资产指向本服务器）
+ *   GET /repos/baikune258/MC-Launcher/releases         → 3 个历史版本（v99.0.0 / v1.0.0 / v0.9.9）
  *   GET /download/<file>                          → 资产下载（KAMUCL-*.exe 为随机内容的测试文件）
  *   GET /SHA256SUMS.txt                           → 与测试文件一致的真实校验值
  *

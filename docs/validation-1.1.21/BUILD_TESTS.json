@@ -55,7 +55,7 @@
   "macArm64": {
     "sourceCommit": "8e29307b0eefa95d12dea948fab2002b7807854b",
     "run": 37820579554,
-    "runURL": "https://github.com/kamubaba-i/KAMUCL/actions/runs/37820579554",
+    "runURL": "https://github.com/baikune258/MC-Launcher/actions/runs/37820579554",
     "nativeBuild": true,
     "nativeOS": "macOS26 ARM64 cloud desktop; minimummacOS13 not independently tested",
     "tests": {

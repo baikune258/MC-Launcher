@@ -85,7 +85,7 @@ export async function createOfflineSkinLaunch(account: Account, snapshot: Snapsh
     signal?.throwIfAborted()
     const port = (reservation.address() as net.AddressInfo).port
     const root = `http://127.0.0.1:${port}/${nonce}/`
-    const metadata = JSON.stringify({ meta: { serverName: 'KAMUCL Offline Appearance', 'feature.no_mojang_namespace': true, 'feature.username_check': true }, skinDomains: ['127.0.0.1'], signaturePublickey: `-----BEGIN PUBLIC KEY-----\n${keys.publicKey.toString('base64')}\n-----END PUBLIC KEY-----` })
+    const metadata = JSON.stringify({ meta: { serverName: 'MC-Launcher Offline Appearance', 'feature.no_mojang_namespace': true, 'feature.username_check': true }, skinDomains: ['127.0.0.1'], signaturePublickey: `-----BEGIN PUBLIC KEY-----\n${keys.publicKey.toString('base64')}\n-----END PUBLIC KEY-----` })
     const values = { port: String(port), nonce, uuid: account.uuid.replaceAll('-', '').toLowerCase(), serverUuid: serverUuid.toString('hex'), username64: Buffer.from(account.username, 'utf8').toString('base64'), sha256: snapshot.sha256, variant: snapshot.variant, png: png.toString('base64'), privateKey: keys.privateKey.toString('base64'), publicKey: keys.publicKey.toString('base64') }
     fs.mkdirSync(directory, { recursive: true })
     signal?.throwIfAborted()

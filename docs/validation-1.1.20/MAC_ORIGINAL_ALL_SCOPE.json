@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "generatedAt": "2026-10-07T20:51:20.545Z",
   "run": 37680785679,
-  "url": "https://github.com/kamubaba-i/KAMUCL/actions/runs/37680785679",
+  "url": "https://github.com/baikune258/MC-Launcher/actions/runs/37680785679",
   "artifactSourceCommit": "0649ed5c7035a0809b9e73117da2b4ff0ea378bd",
   "productionSourceCommit": "6af4611d819f652b14bd37e6b67b4f32a761fc28",
   "version": "1.1.20",
@@ -56,12 +56,12 @@
     "archiveAPIDigest": "sha256:c9edd19db7211b0f5358828195417fffb3f18f537e4c85497b270e6bd51b9e0b",
     "assets": [
       {
-        "name": "KAMUCL-1.1.20-mac-arm64.zip",
+        "name": "MC-Launcher-1.1.20-mac-arm64.zip",
         "bytes": 125935198,
         "sha256": "0b06dd56486a6b0dbe76313a1e2124a4848efa919352f7efd7e3e69805ff4ebe"
       },
       {
-        "name": "KAMUCL-1.1.20-mac-arm64.dmg",
+        "name": "MC-Launcher-1.1.20-mac-arm64.dmg",
         "bytes": 135777035,
         "sha256": "8c4ea12185ac0139e572bba7e9fcff9cd2782489865275f79b739c7b7449a7d1"
       }

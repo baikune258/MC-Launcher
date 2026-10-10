@@ -1,6 +1,6 @@
-# KAMUCL 1.1.11 Linux 接续构建、安装与验收边界
+# MC-Launcher 1.1.11 Linux 接续构建、安装与验收边界
 
-2026-10-04 09:02（Asia/Hong_Kong）当前快照：第六 [37163779037](https://github.com/kamubaba-i/KAMUCL/actions/runs/37163779037) 绑定 `69c1e89ba23a007535c77bae65052f19b6d87f58`。Ubuntu 24.04 x64／ARM64 两个原生打包作业通过，各 864 项为 861 通过、0 失败、3 skip。三格式共六包的实际原生干净解压、26／25／25 个成员闭包、ELF／执行位／摘要及每格式 resources/kamucl-linux.json 内嵌来源与目标 ELF 的 Electron 44.3.0 观察均通过，独立解包复核保持 nativeDesktop=false。
+2026-10-04 09:02（Asia/Hong_Kong）当前快照：第六 [37163779037](https://github.com/baikune258/MC-Launcher/actions/runs/37163779037) 绑定 `69c1e89ba23a007535c77bae65052f19b6d87f58`。Ubuntu 24.04 x64／ARM64 两个原生打包作业通过，各 864 项为 861 通过、0 失败、3 skip。三格式共六包的实际原生干净解压、26／25／25 个成员闭包、ELF／执行位／摘要及每格式 resources/kamucl-linux.json 内嵌来源与目标 ELF 的 Electron 44.3.0 观察均通过，独立解包复核保持 nativeDesktop=false。
 
 Ubuntu 24.04 两架构与 26.04 x64 的 Xvfb 已真正启动应用，三次均在 ANGLE／OpenGL／Mesa llvmpipe 创建 WebGL 失败后出现 skin canvas missing；不是第五轮未启动应用的 xdpyinfo 前置失败。原先首错遮蔽已经修正，第六原错误／时间和失败完整保留。三主机均 Accelerated:no；24.04 为 Mesa 25.2.8／LLVM20，26.04 为 Mesa 26.0.8／LLVM21。EGL／GL 库有实际安装记录，mesa-vulkan-drivers 是否存在和同进程 GPU feature status 尚无原观察，不能断言缺失。精确 [Chromium152 软件驱动规则](https://github.com/chromium/chromium/blob/152.0.7977.78/gpu/config/software_rendering_list.json) 是强线索，不是已证明的最终根因。
 
@@ -8,7 +8,7 @@ Ubuntu 24.04 两架构与 26.04 x64 的 Xvfb 已真正启动应用，三次均�
 
 第六旧源码／交接漏收 build/icon.png 和 build/icon-512.png，原审计 out/handoff111-history-source-closure-defect.json 保留；下一源码／交接必须重新核对完整构建输入闭包，尚无未来批次成功声明。
 
-2026-10-04 08:02（Asia/Hong_Kong）第五轮历史快照：第五轮 run [37160588146](https://github.com/kamubaba-i/KAMUCL/actions/runs/37160588146) 精确绑定 `5167500b6c27b9bbdd1e80f22d91d3f5904007eb`。Ubuntu 24.04 的 x64／ARM64 原生全套各 857 项：854 通过、0 失败、3 项既有平台 skip。两个打包作业成功，AppImage／DEB／tar.gz 共六包的原生干净解压、ELF／执行位／逐文件摘要和原包清单检查通过；两架构各 portable 26、DEB 25、AppImage 25 个提取文件。
+2026-10-04 08:02（Asia/Hong_Kong）第五轮历史快照：第五轮 run [37160588146](https://github.com/baikune258/MC-Launcher/actions/runs/37160588146) 精确绑定 `5167500b6c27b9bbdd1e80f22d91d3f5904007eb`。Ubuntu 24.04 的 x64／ARM64 原生全套各 857 项：854 通过、0 失败、3 项既有平台 skip。两个打包作业成功，AppImage／DEB／tar.gz 共六包的原生干净解压、ELF／执行位／逐文件摘要和原包清单检查通过；两架构各 portable 26、DEB 25、AppImage 25 个提取文件。
 
 Ubuntu 24.04 两架构及 26.04 x64 的三次 Xvfb compatibility 预检均在 `xdpyinfo` 缺失处失败（`spawnSync xdpyinfo ENOENT`），应用未启动，GUI 模块执行数为 0。后续 `scandir out ENOENT` 又遮蔽首错；原始日志及原不完整 summary 保留，不回填为通过。已冻结补充 `x11-utils`、独立输出目录及保留首错的收尾流程，必须新原生重跑。真实桌面 runner 仍未配置，四种正式 OS／架构均未通过桌面、游戏或完整资格；26.04 ARM64 也无 hosted compatibility 预检。
 
@@ -71,9 +71,9 @@ npm run dist:linux
 
 | 文件 | 用途 |
 | --- | --- |
-| `KAMUCL-1.1.11-linux-x64.AppImage` 或 `…-arm64.AppImage` | 单文件 AppImage |
-| `KAMUCL-1.1.11-linux-x64.deb` 或 `…-arm64.deb` | 系统安装包；内部架构为 amd64／arm64 |
-| `KAMUCL-1.1.11-linux-x64.tar.gz` 或 `…-arm64.tar.gz` | 用户目录便携包，根目录为 KAMUCL |
+| `MC-Launcher-1.1.11-linux-x64.AppImage` 或 `…-arm64.AppImage` | 单文件 AppImage |
+| `MC-Launcher-1.1.11-linux-x64.deb` 或 `…-arm64.deb` | 系统安装包；内部架构为 amd64／arm64 |
+| `MC-Launcher-1.1.11-linux-x64.tar.gz` 或 `…-arm64.tar.gz` | 用户目录便携包，根目录为 MC-Launcher |
 | `SHA256SUMS-linux-x64.txt` 或 `SHA256SUMS-linux-arm64.txt` | 三种成品的 SHA256 |
 | `linux-proof-架构-packages/summary.json` | 源提交、架构、包大小、SHA256 与解压检查结果 |
 
@@ -93,7 +93,7 @@ sha256sum -c "SHA256SUMS-linux-${taskArch}.txt" --ignore-missing
 使用桌面系统安装器打开 DEB 并确认安装，或由用户明确执行：
 
 ```sh
-sudo apt install "./KAMUCL-1.1.11-linux-${taskArch}.deb"
+sudo apt install "./MC-Launcher-1.1.11-linux-${taskArch}.deb"
 ```
 
 APT 会解析包的依赖；不能把 `dpkg-deb -x` 的解包结果当作完成系统安装。当前打包依赖的 electron-builder 安装脚本会处理桌面入口、sandbox 权限，并在系统支持时安装当前应用的 AppArmor userns profile；这些路径与安装结果仍需在实际 Ubuntu 24／26 主机验证。
@@ -106,14 +106,14 @@ APT 会解析包的依赖；不能把 `dpkg-deb -x` 的解包结果当作完成�
 
 ```sh
 sudo apt install libfuse2t64 squashfs-tools
-chmod +x "KAMUCL-1.1.11-linux-${taskArch}.AppImage"
-"./KAMUCL-1.1.11-linux-${taskArch}.AppImage"
+chmod +x "MC-Launcher-1.1.11-linux-${taskArch}.AppImage"
+"./MC-Launcher-1.1.11-linux-${taskArch}.AppImage"
 ```
 
 缺少 FUSE 时，AppImage 的手动提取路径仍保留，可在独立用户目录尝试：
 
 ```sh
-"./KAMUCL-1.1.11-linux-${taskArch}.AppImage" --appimage-extract
+"./MC-Launcher-1.1.11-linux-${taskArch}.AppImage" --appimage-extract
 ./squashfs-root/AppRun
 ```
 
@@ -123,11 +123,11 @@ chmod +x "KAMUCL-1.1.11-linux-${taskArch}.AppImage"
 
 ### tar.gz：用户目录便携运行
 
-在独立且可写的目录保留整个 KAMUCL 文件夹：
+在独立且可写的目录保留整个 MC-Launcher 文件夹：
 
 ```sh
-tar -xzf "KAMUCL-1.1.11-linux-${taskArch}.tar.gz"
-./KAMUCL/kamucl
+tar -xzf "MC-Launcher-1.1.11-linux-${taskArch}.tar.gz"
+./MC-Launcher/kamucl
 ```
 
 保留资源文件、目录结构与执行权限。FAT／特殊挂载的 `noexec` 策略或人为去掉执行位可能阻止启动；更新时会在替换前检查执行权限。便携目录放入 `/usr` 或 `/opt` 会按系统安装路径处理，接续验收使用独立用户目录。
@@ -144,7 +144,7 @@ sudo apt install libgtk-3-0t64 libnss3 libxss1 libasound2t64 libgbm1 libx11-6 li
 
 应用和游戏窗口控制以 X11 或 Wayland 会话中的 XWayland 为当前基线。需要实际可用的 `DISPLAY`；纯 Wayland、禁用 XWayland或管理员强制覆盖为纯 Wayland 的情况未获完整支持结论。窗口助手只匹配本次游戏 PID，发送正常关闭消息并观测焦点，不通过强杀游戏模拟正常保存。关闭启动器后游戏继续运行、游戏正常保存及焦点交接仍须实机验证。
 
-Ubuntu 24／26 具有 AppArmor 对非特权 user namespace 的限制；浏览器 sandbox 使用该能力，未获应用 profile 允许的便携包可能因此被系统阻止。KAMUCL 的 AppRun 和桌面入口**不自动添加 `--no-sandbox`，也不为用户关闭全局 AppArmor 或 userns 限制**。优先使用正常 DEB 安装及每应用策略，并保存真实系统错误。相关机制见 [Ubuntu AppArmor 文档](https://documentation.ubuntu.com/security/security-features/privilege-restriction/apparmor/) 与 [Ubuntu 支持版本安全功能表](https://documentation.ubuntu.com/security/security-features/security-features-tables/)。
+Ubuntu 24／26 具有 AppArmor 对非特权 user namespace 的限制；浏览器 sandbox 使用该能力，未获应用 profile 允许的便携包可能因此被系统阻止。MC-Launcher 的 AppRun 和桌面入口**不自动添加 `--no-sandbox`，也不为用户关闭全局 AppArmor 或 userns 限制**。优先使用正常 DEB 安装及每应用策略，并保存真实系统错误。相关机制见 [Ubuntu AppArmor 文档](https://documentation.ubuntu.com/security/security-features/privilege-restriction/apparmor/) 与 [Ubuntu 支持版本安全功能表](https://documentation.ubuntu.com/security/security-features/security-features-tables/)。
 
 工作流的 Xvfb smoke 只在一次性 GitHub hosted VM 中暂时调整 userns 限制，Chromium sandbox 仍保留。该配置不能复制成用户安装要求，也不能拿它替代默认安全策略下的真实桌面验收。
 

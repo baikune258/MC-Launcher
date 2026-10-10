@@ -20,7 +20,7 @@ export class ApiClient {
   readonly userAgent: string
   readonly timeoutMs: number
   private deadlines = new Map<string, number>()
-  constructor(options: ApiClientOptions = {}) { this.userAgent = options.userAgent ?? `KAMUCL-App/${APP_VERSION}`; this.timeoutMs = options.timeoutMs ?? HTTP_TIMEOUT_MS }
+  constructor(options: ApiClientOptions = {}) { this.userAgent = options.userAgent ?? `MC-Launcher/${APP_VERSION}`; this.timeoutMs = options.timeoutMs ?? HTTP_TIMEOUT_MS }
   async do(base: string, method: 'GET' | 'POST', route: string, query: Record<string, QueryValue | QueryValue[]>, body: unknown, signal?: AbortSignal): Promise<unknown> {
     if (!validateServerURL(base)) throw new APIError('NETWORK', '服务器地址无效')
     const key = route === '/room/update' ? `${base}|${String((body as { code?: string })?.code ?? '')}` : ''

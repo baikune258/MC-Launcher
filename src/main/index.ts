@@ -37,6 +37,11 @@ const PORTABLE_EXE = process.env.PORTABLE_EXECUTABLE_FILE
 const LEGACY_USER_DATA = app.getPath('userData')
 if (PORTABLE_EXE) {
   try { app.setPath('userData', join(dirname(PORTABLE_EXE), 'MC-Launcher-data')) } catch (error) { console.warn('[MC-Launcher] userData 重定向失败', error) }
+  // 旧版运行时目录 KAMUCL-runtime（仅启动器自身二进制缓存，游戏数据都在 MC-Launcher-data）：
+  // 新版本解压到 MC-Launcher-runtime 后，旧的上一代缓存目录已无进程占用，启动时清理掉，
+  // 避免安装目录残留原作者命名的文件夹；删除失败（如仍有旧进程占用）仅记日志不打断启动。
+  const legacyRuntime = join(dirname(PORTABLE_EXE), 'KAMUCL-runtime')
+  try { if (existsSync(legacyRuntime)) rmSync(legacyRuntime, { recursive: true, force: true }) } catch (error) { console.warn('[MC-Launcher] 旧运行时目录清理失败', error) }
 }
 
 configureRuntimeGraphics(app.commandLine, process.platform, dirname(process.execPath))

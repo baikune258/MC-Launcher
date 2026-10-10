@@ -305,7 +305,7 @@
       "file": "evidence/windows-community-queue.png",
       "bytes": 72417,
       "sha256": "c13d174f2eaf86aa0cb246dcea01fc50b367ee7e09f09b11dc4a5605e7df3e09",
-      "caption": "UI: controlled community queue, synthetic E:/KAMUCL/out games path and example JAR names; no live service transfer",
+      "caption": "UI: controlled community queue, synthetic E:/MC-Launcher/out games path and example JAR names; no live service transfer",
       "dimensions": [
         960,
         620

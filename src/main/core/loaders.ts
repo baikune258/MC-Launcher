@@ -605,7 +605,7 @@ const MODRINTH_BASES = [
   'https://api.modrinth.com/v2',
   'https://mod.mcimirror.top/modrinth/v2'
 ]
-const MODRINTH_UA = { 'User-Agent': 'KAMUCL/0.4.1 (kamucl launcher)' }
+const MODRINTH_UA = { 'User-Agent': 'MC-Launcher/1.0 (MC-Launcher)' }
 
 interface ModrinthFile {
   url?: string

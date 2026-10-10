@@ -1,4 +1,4 @@
-# KAMUCL 1.1.18 离线皮肤启动链独立验收
+# MC-Launcher 1.1.18 离线皮肤启动链独立验收
 
 审查日期：2026-10-07（Asia/Hong_Kong）。审查者：`/root/packs118`，未实现本报告评价的离线皮肤存储、启动衔接、JVM provider 或皮肤界面。本次仅审查产品代码、原始测试输出与最终运行证据，并新增本报告；未修改产品。
 
@@ -31,7 +31,7 @@
 
 ## 最终证据与完整性核对
 
-最终 Windows EXE：`release/KAMUCL-1.1.18.exe`。
+最终 Windows EXE：`release/MC-Launcher-1.1.18.exe`。
 
 ```text
 SHA256 a0427950efe94c5ffc5f05cca9dcc33b79bab96293cfde7e0c89a2f7198be887

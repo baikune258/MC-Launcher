@@ -113,7 +113,7 @@ async function call(discovery: BridgeDiscovery, pathname: string, body?: unknown
 /** 连接状态：发现文件存在且 ping 通（游戏退出后端口关闭，ping 失败即断开） */
 export async function bridgeStatus(versionId: string): Promise<BridgeStatus> {
   const discovery = readDiscovery(versionId)
-  if (!discovery) return { connected: false, reason: '未发现桥接服务：请使用内置 KAMUCL Bridge 的实例启动游戏' }
+  if (!discovery) return { connected: false, reason: '未发现桥接服务：请使用内置 Bridge 的实例启动游戏' }
   // 发现文件可能来自上次异常退出的残留：校验进程仍在运行
   try {
     process.kill(discovery.pid, 0)

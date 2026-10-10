@@ -1,10 +1,10 @@
-# KAMUCL 1.1.9
+# MC-Launcher 1.1.9
 
 2026-10-03 11:01（Asia/Hong_Kong）。
 
 本轮仅交付 Windows。产品提交 07a1d87c0710ab070b763172d27dcf7cebd6547b；EXE SHA256 11a8f16142a0f40519adb2203a91ee7bf74b2ab35ef456729e5034a8fc0aafef；renderer index-rFSz7oqx.js；Windows 实际 GUI QA 07a1d87c0710ab070b763172d27dcf7cebd6547b。暂停前 Mac 历史 QA／源码桥接 a8496bf81efc1f815dc89b7a3e078f8b6ed89b74、CI 37087543778 不作为 Windows 实测 QA 或全球合格结论。Windows production07a1d87c and its real GUI/PCL/portable validation remain unchanged. Subsequent QA/source a8496bf product inputs are identical. User explicitly deferred both Mac architectures; Windows-only release asset selection and delivery documentation do not change app build inputs. Original Windows GUI QA07 and PCL QA0a exact source receipts remain separately bound to the current07 executable; Mac results are historical and never Windows or global qualification.
 
-皮肤编辑器采用模板布局并固定关闭／保存操作；勾选、半选和安装弹窗统一主题。LOGO 原位卡慕单人逐次排队拍打，保留其余六人的历史计数。统一 import:probe 优先识别整合包清单，修复 PCL 包夹带存档时的误分类；用户图片、设置、收藏、原始包和现有实例继续保留。
+皮肤编辑器采用模板布局并固定关闭／保存操作；勾选、半选和安装弹窗统一主题。LOGO 原位baikun单人逐次排队拍打，保留其余六人的历史计数。统一 import:probe 优先识别整合包清单，修复 PCL 包夹带存档时的误分类；用户图片、设置、收藏、原始包和现有实例继续保留。
 
 实际日志 out/test-119-windows-only-release-final.log：783/783 通过，失败／跳过／取消／todo 均为零，耗时 75722.0961 ms。Windows 范围独立评审 complete／passed：视觉 9、交互 9.1、动效 9 各自达到 9，当前 Windows 关键缺陷为零；不使用平均分或推断填分。
 
@@ -28,9 +28,9 @@ Windows 黑橙独立补验：release/validation-1.1.9/Delivery/Palette-State-Obs
 
 | 成品 | 字节数 | SHA256 |
 | --- | ---: | --- |
-| KAMUCL-1.1.9.exe | 97282718 | 11a8f16142a0f40519adb2203a91ee7bf74b2ab35ef456729e5034a8fc0aafef |
-| KAMUCL-1.1.9-windows-x64.zip | 97314287 | d71d0173ed7d3cabb92b70b77f08f773385c25d4f613d984a07c6a3a1d91149c |
-| KAMUCL-1.1.9-windows-x64-unpacked.zip | 143047398 | c33f492fc66054991cf8d8f904df2ffc477904e8e4e828d44e3c5901dea11c30 |
+| MC-Launcher-1.1.9.exe | 97282718 | 11a8f16142a0f40519adb2203a91ee7bf74b2ab35ef456729e5034a8fc0aafef |
+| MC-Launcher-1.1.9-windows-x64.zip | 97314287 | d71d0173ed7d3cabb92b70b77f08f773385c25d4f613d984a07c6a3a1d91149c |
+| MC-Launcher-1.1.9-windows-x64-unpacked.zip | 143047398 | c33f492fc66054991cf8d8f904df2ffc477904e8e4e828d44e3c5901dea11c30 |
 
 ## 历史失败与未覆盖
 
@@ -60,7 +60,7 @@ Windows 独立 lifecycle 首次原 run exit1：原生最小化成功，document.
 
 e81ddc7 CI37080988726：ARM job111081241919 与 Intel job111081241732 原结论均 success，APP／DMG 功能、实际游戏、工具与更新的作业成功不改写为失败。独立评审拒收该候选：Intel visual9／interaction9.1／motion8.5，Windows 与 ARM 原分数分别保留，不平均、不用正式采集或诊断B抵消原始A。正常 ARM CDP 60.22155321151912／59.28990924304912 fps 与 SCK whole 57.4999999999986／56.42857142857235 fps 原 passed=true；Intel CDP 29.680599324439076／29.249667689740264 fps、SCK whole 26.01303154825863／27.37552248580128 fps 原 passed=false。六个独立 observer ABA case 功能 complete=true、每项10真实声源／计数／保存与正面结束；六项原 wholeFPS=false仍保留，不替代正式 baseline。clocks-A-original 完整原帧44→45 131.00935700003902ms、46→49 136.11220999996476ms，47／48原 idle 无伪造像素；源间隔324.9／262.6ms附近真实停顿未覆盖为通过。四帧 BGRA／PNG 全RGBA、六sidecar原PTS／status、官方ZIP／源Git blob／原日志与8787个安全成员SHA／大小／闭包已核对。额外时钟探针、67ms长任务、宿主或产品合成路径的因果仍未确立；B较快不是修复证明，物理听感和真实Microsoft上传等未覆盖项保留。原冻结清单 release/validation-1.1.9/Delivery/History/native-e81ddc7-job-success-independent-intel-motion-rejection/evidence.json（SHA256 32fd38f74973190f166caa4d09f81fc33ed2abe9597ab43d0d58618790f3d284）；宽scope完整评审仅引用原size／SHA，精简公共评审与14个原失败BGRA／PNG／JSON完整保留。
 
-历史完整原始证据：KAMUCL-1.1.9-validation-history-part001.zip、KAMUCL-1.1.9-validation-history-part002.zip、KAMUCL-1.1.9-validation-history-part003.zip、KAMUCL-1.1.9-validation-history-part004.zip、KAMUCL-1.1.9-validation-history-part005.zip，共 5 卷，每卷小于 2 GB；索引 KAMUCL-1.1.9-validation-history-index.json（SHA256 9284b34bda62cdce1b14b9fda11953b3326c201df4e174ca2a4b34fd2141fca4）。已核对当前 155056 个成员、原字节与分卷摘要，保留干净解压回执。临时浏览器 profile／缓存仅在公开排除记录中列明；原 out 与真实用户数据未删改。
+历史完整原始证据：MC-Launcher-1.1.9-validation-history-part001.zip、MC-Launcher-1.1.9-validation-history-part002.zip、MC-Launcher-1.1.9-validation-history-part003.zip、MC-Launcher-1.1.9-validation-history-part004.zip、MC-Launcher-1.1.9-validation-history-part005.zip，共 5 卷，每卷小于 2 GB；索引 MC-Launcher-1.1.9-validation-history-index.json（SHA256 9284b34bda62cdce1b14b9fda11953b3326c201df4e174ca2a4b34fd2141fca4）。已核对当前 155056 个成员、原字节与分卷摘要，保留干净解压回执。临时浏览器 profile／缓存仅在公开排除记录中列明；原 out 与真实用户数据未删改。
 
 仍未覆盖：物理扬声器／耳机的实际掌击听感及爆音感知，真实 Microsoft 登录／皮肤上传，社区两平台真实在线收藏安装，Mac 实际用户 PCL 包或私有存档游玩，公网 NAT、长期稳定性、磁盘耗尽、全部缩放与无中键设备实物验证，Developer ID 签名／公证。数字峰值与声源检查不替代听感。Mac 本轮工作和输出暂停，未声明任何 Mac 合格；实例专属图片优先主要依据源码／测试。
 

@@ -2,7 +2,7 @@
 // the candidate comes from this workflow's actual current-version package.
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict'),crypto=require('node:crypto'),{execFileSync}=require('node:child_process'),{pipeline}=require('node:stream/promises')
 const {prepare,groupProfile}=require('./resource-fixtures113.cjs'),{runSession}=require('./resource-baseline113.cjs'),{compileNative,startMacSampler,summarizeMac}=require('./resource-mac113-native.cjs'),{freezeNoise,comparePaired,analysisSources}=require('./resource-mac113-analysis.cjs'),{readMacPackageIdentity}=require('./mac-package-identity.cjs'),provenance=require('./resource-provenance113.cjs')
-const BASELINE=Object.freeze({version:'1.1.12',arch:'arm64',sourceCommit:'3d0baffd0a24cbf920fc256da51754f602a8ed8e',runtimeVersion:'44.3.0',minimumSystemVersion:'13.0.0',url:'https://github.com/kamubaba-i/KAMUCL/releases/download/v1.1.12/KAMUCL-1.1.12-mac-arm64.zip',bytes:127157251,sha256:'4afc952a773bfd8fae80fac5e765e6bb609bfce5866c78cf9bb8aa3d004c7172'})
+const BASELINE=Object.freeze({version:'1.1.12',arch:'arm64',sourceCommit:'3d0baffd0a24cbf920fc256da51754f602a8ed8e',runtimeVersion:'44.3.0',minimumSystemVersion:'13.0.0',url:'https://github.com/baikune258/MC-Launcher/releases/download/v1.1.12/KAMUCL-1.1.12-mac-arm64.zip',bytes:127157251,sha256:'4afc952a773bfd8fae80fac5e765e6bb609bfce5866c78cf9bb8aa3d004c7172'})
 const resourceTheme='black-orange'
 function evidenceProvenance(platform,runFile){
  const run=JSON.parse(fs.readFileSync(runFile)),snapshot=run.analysisSourceSnapshot;assert(snapshot&&snapshot.directory==='tool-sources-analysis','Original analysis source byte snapshot is required')

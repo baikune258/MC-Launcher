@@ -5,7 +5,7 @@
   "node": "v24.16.0",
   "electron": "44.3.0",
   "electronExecutable": {
-    "path": "E:\\KAMUCL\\node_modules\\electron\\dist\\electron.exe",
+    "path": "E:\\MC-Launcher\\node_modules\\electron\\dist\\electron.exe",
     "sha256": "e048632e03fabc96de5e10afbebc0aa31f4e1674155ea3d270597fe7523f9d80"
   },
   "files": [

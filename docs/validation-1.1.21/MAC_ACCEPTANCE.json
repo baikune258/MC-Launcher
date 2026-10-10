@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "projectionCompleteForEvidenceSnapshot": true,
   "version": "1.1.21",
-  "repository": "kamubaba-i/KAMUCL",
+  "repository": "baikune258/MC-Launcher",
   "finalTagCommit": null,
   "sourceCommit": "8e29307b0eefa95d12dea948fab2002b7807854b",
   "finalRunObserved": true,
@@ -40,12 +40,12 @@
     },
     "assets": [
       {
-        "name": "KAMUCL-1.1.21-mac-arm64.zip",
+        "name": "MC-Launcher-1.1.21-mac-arm64.zip",
         "bytes": 125954202,
         "sha256": "a4930cc3a722b9308ee7df18b9f97484419306a0782257ef821b1bcd30b27579"
       },
       {
-        "name": "KAMUCL-1.1.21-mac-arm64.dmg",
+        "name": "MC-Launcher-1.1.21-mac-arm64.dmg",
         "bytes": 135777009,
         "sha256": "36969f1095a211cfede974b34fe0884a4119a6f019095b960ee57861108c07a5"
       }
@@ -64,7 +64,7 @@
   },
   "originalFullNative": {
     "runId": 37820579554,
-    "url": "https://github.com/kamubaba-i/KAMUCL/actions/runs/37820579554",
+    "url": "https://github.com/baikune258/MC-Launcher/actions/runs/37820579554",
     "workflow": ".github/workflows/mac-build.yml",
     "event": "workflow_dispatch",
     "runAttempt": 1,
@@ -78,7 +78,7 @@
         "conclusion": "success",
         "startedAt": "2026-10-08T17:57:44Z",
         "completedAt": "2026-10-08T18:04:39Z",
-        "url": "https://github.com/kamubaba-i/KAMUCL/actions/runs/37820579554/job/113460274229"
+        "url": "https://github.com/baikune258/MC-Launcher/actions/runs/37820579554/job/113460274229"
       },
       {
         "jobId": 113463353285,
@@ -87,7 +87,7 @@
         "conclusion": "success",
         "startedAt": "2026-10-08T18:04:47Z",
         "completedAt": "2026-10-08T18:08:39Z",
-        "url": "https://github.com/kamubaba-i/KAMUCL/actions/runs/37820579554/job/113463353285"
+        "url": "https://github.com/baikune258/MC-Launcher/actions/runs/37820579554/job/113463353285"
       },
       {
         "jobId": 113463353313,
@@ -96,7 +96,7 @@
         "conclusion": "failure",
         "startedAt": "2026-10-08T18:04:46Z",
         "completedAt": "2026-10-08T18:11:45Z",
-        "url": "https://github.com/kamubaba-i/KAMUCL/actions/runs/37820579554/job/113463353313"
+        "url": "https://github.com/baikune258/MC-Launcher/actions/runs/37820579554/job/113463353313"
       },
       {
         "jobId": 113463353355,
@@ -105,7 +105,7 @@
         "conclusion": "failure",
         "startedAt": "2026-10-08T18:07:15Z",
         "completedAt": "2026-10-08T18:14:47Z",
-        "url": "https://github.com/kamubaba-i/KAMUCL/actions/runs/37820579554/job/113463353355"
+        "url": "https://github.com/baikune258/MC-Launcher/actions/runs/37820579554/job/113463353355"
       },
       {
         "jobId": 113463353358,
@@ -114,7 +114,7 @@
         "conclusion": "success",
         "startedAt": "2026-10-08T18:04:47Z",
         "completedAt": "2026-10-08T18:07:08Z",
-        "url": "https://github.com/kamubaba-i/KAMUCL/actions/runs/37820579554/job/113463353358"
+        "url": "https://github.com/baikune258/MC-Launcher/actions/runs/37820579554/job/113463353358"
       },
       {
         "jobId": 113463353385,
@@ -123,7 +123,7 @@
         "conclusion": "failure",
         "startedAt": "2026-10-08T18:04:47Z",
         "completedAt": "2026-10-08T18:13:46Z",
-        "url": "https://github.com/kamubaba-i/KAMUCL/actions/runs/37820579554/job/113463353385"
+        "url": "https://github.com/baikune258/MC-Launcher/actions/runs/37820579554/job/113463353385"
       },
       {
         "jobId": 113463353387,
@@ -132,7 +132,7 @@
         "conclusion": "success",
         "startedAt": "2026-10-08T18:08:49Z",
         "completedAt": "2026-10-08T18:14:45Z",
-        "url": "https://github.com/kamubaba-i/KAMUCL/actions/runs/37820579554/job/113463353387"
+        "url": "https://github.com/baikune258/MC-Launcher/actions/runs/37820579554/job/113463353387"
       },
       {
         "jobId": 113463353459,
@@ -141,7 +141,7 @@
         "conclusion": "failure",
         "startedAt": "2026-10-08T18:04:46Z",
         "completedAt": "2026-10-08T18:12:18Z",
-        "url": "https://github.com/kamubaba-i/KAMUCL/actions/runs/37820579554/job/113463353459"
+        "url": "https://github.com/baikune258/MC-Launcher/actions/runs/37820579554/job/113463353459"
       },
       {
         "jobId": 113463353558,
@@ -150,7 +150,7 @@
         "conclusion": "success",
         "startedAt": "2026-10-08T18:11:50Z",
         "completedAt": "2026-10-08T18:13:12Z",
-        "url": "https://github.com/kamubaba-i/KAMUCL/actions/runs/37820579554/job/113463353558"
+        "url": "https://github.com/baikune258/MC-Launcher/actions/runs/37820579554/job/113463353558"
       },
       {
         "jobId": 113463353559,
@@ -159,7 +159,7 @@
         "conclusion": "success",
         "startedAt": "2026-10-08T18:14:54Z",
         "completedAt": "2026-10-08T18:17:46Z",
-        "url": "https://github.com/kamubaba-i/KAMUCL/actions/runs/37820579554/job/113463353559"
+        "url": "https://github.com/baikune258/MC-Launcher/actions/runs/37820579554/job/113463353559"
       },
       {
         "jobId": 113463353638,
@@ -168,7 +168,7 @@
         "conclusion": "success",
         "startedAt": "2026-10-08T18:12:25Z",
         "completedAt": "2026-10-08T18:15:20Z",
-        "url": "https://github.com/kamubaba-i/KAMUCL/actions/runs/37820579554/job/113463353638"
+        "url": "https://github.com/baikune258/MC-Launcher/actions/runs/37820579554/job/113463353638"
       },
       {
         "jobId": 113463353706,
@@ -177,7 +177,7 @@
         "conclusion": "success",
         "startedAt": "2026-10-08T18:13:19Z",
         "completedAt": "2026-10-08T18:15:19Z",
-        "url": "https://github.com/kamubaba-i/KAMUCL/actions/runs/37820579554/job/113463353706"
+        "url": "https://github.com/baikune258/MC-Launcher/actions/runs/37820579554/job/113463353706"
       },
       {
         "jobId": 113463353723,
@@ -186,7 +186,7 @@
         "conclusion": "failure",
         "startedAt": "2026-10-08T18:13:53Z",
         "completedAt": "2026-10-08T18:23:58Z",
-        "url": "https://github.com/kamubaba-i/KAMUCL/actions/runs/37820579554/job/113463353723"
+        "url": "https://github.com/baikune258/MC-Launcher/actions/runs/37820579554/job/113463353723"
       },
       {
         "jobId": 113463355889,
@@ -195,7 +195,7 @@
         "conclusion": "skipped",
         "startedAt": "2026-10-08T18:04:39Z",
         "completedAt": "2026-10-08T18:04:39Z",
-        "url": "https://github.com/kamubaba-i/KAMUCL/actions/runs/37820579554/job/113463355889"
+        "url": "https://github.com/baikune258/MC-Launcher/actions/runs/37820579554/job/113463355889"
       },
       {
         "jobId": 113463355894,
@@ -204,7 +204,7 @@
         "conclusion": "skipped",
         "startedAt": "2026-10-08T18:04:39Z",
         "completedAt": "2026-10-08T18:04:39Z",
-        "url": "https://github.com/kamubaba-i/KAMUCL/actions/runs/37820579554/job/113463355894"
+        "url": "https://github.com/baikune258/MC-Launcher/actions/runs/37820579554/job/113463355894"
       }
     ],
     "jobCounts": {
@@ -365,7 +365,7 @@
   },
   "supplementaryReuse": {
     "runId": 37831726301,
-    "url": "https://github.com/kamubaba-i/KAMUCL/actions/runs/37831726301",
+    "url": "https://github.com/baikune258/MC-Launcher/actions/runs/37831726301",
     "workflow": ".github/workflows/mac-batch121-reuse.yml",
     "qaSourceCommit": "263df7aacacbb4577e2f8c0f0232cec5d1a4b9b1",
     "artifactSourceCommit": "8e29307b0eefa95d12dea948fab2002b7807854b",

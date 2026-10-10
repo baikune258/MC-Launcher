@@ -5,7 +5,7 @@ import { useMotion } from '../motion'
 const { decorativeActive } = useMotion()
 watch(decorativeActive, reset)
 const props = defineProps<{ disabled?: boolean }>()
-const sentence = '尝试打造一个方便UP主高频使用的启动器'
+const sentence = 'MC-Launcher，属于你的我的世界启动器'
 const host = ref<HTMLElement>()
 let slots: HTMLElement[] = [], glyphs: HTMLElement[] = []
 let centers: Array<{ x: number; y: number }> = []
@@ -54,7 +54,7 @@ onUnmounted(() => { reset(); observer?.disconnect(); reduced?.removeEventListene
   <div ref="host" class="creator-motto" data-ui="topbar:creator-motto">
     <span class="sr-only">{{ sentence }}</span>
     <span class="motto-line" aria-hidden="true" @pointerenter="measure" @pointermove="move" @pointerleave="reset" @pointercancel="reset" @dblclick="maximize">
-      <span v-for="(letter, index) in sentence" :key="index" class="motto-slot"><span class="motto-glyph" :class="{ accent: letter === 'U' || letter === 'P' }">{{ letter }}</span></span>
+      <span v-for="(letter, index) in sentence" :key="index" class="motto-slot"><span class="motto-glyph" :class="{ accent: letter === 'M' || letter === 'C' }">{{ letter }}</span></span>
     </span>
   </div>
 </template>

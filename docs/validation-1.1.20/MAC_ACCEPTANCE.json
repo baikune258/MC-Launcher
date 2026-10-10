@@ -9,7 +9,7 @@
   "qaSourceCommit": "ad279ae2f0e556165d557bc7121153bd34a23d60",
   "originalAllRun": {
     "run": 37680785679,
-    "url": "https://github.com/kamubaba-i/KAMUCL/actions/runs/37680785679",
+    "url": "https://github.com/baikune258/MC-Launcher/actions/runs/37680785679",
     "success": 8,
     "failure": 6,
     "requestedSkip": 1,
@@ -22,7 +22,7 @@
   },
   "finalScopedRun": {
     "run": 37683666380,
-    "url": "https://github.com/kamubaba-i/KAMUCL/actions/runs/37683666380",
+    "url": "https://github.com/baikune258/MC-Launcher/actions/runs/37683666380",
     "projectionFile": "AD279_PUBLIC_SCOPE.json",
     "originalIndexSHA256": "aecbb2bdd601e00312ab2123c3c51353a8b4287e17c5656da458a0fa30d0f911",
     "originalJobAcceptancePassed": false,
@@ -57,7 +57,7 @@
               {
                 "at": "2026-10-07T20:40:54.696Z",
                 "unixMs": 1791405654696,
-                "message": "KAMUCL 1.1.20 session started (darwin arm64)"
+                "message": "MC-Launcher 1.1.20 session started (darwin arm64)"
               },
               {
                 "at": "2026-10-07T20:40:56.718Z",
@@ -122,7 +122,7 @@
               {
                 "at": "2026-10-07T20:41:46.965Z",
                 "unixMs": 1791405706965,
-                "message": "KAMUCL 1.1.20 session started (darwin arm64)"
+                "message": "MC-Launcher 1.1.20 session started (darwin arm64)"
               },
               {
                 "at": "2026-10-07T20:41:47.466Z",
@@ -187,7 +187,7 @@
               {
                 "at": "2026-10-07T20:42:30.072Z",
                 "unixMs": 1791405750072,
-                "message": "KAMUCL 1.1.20 session started (darwin arm64)"
+                "message": "MC-Launcher 1.1.20 session started (darwin arm64)"
               },
               {
                 "at": "2026-10-07T20:42:30.698Z",
@@ -252,7 +252,7 @@
               {
                 "at": "2026-10-07T20:43:38.250Z",
                 "unixMs": 1791405818250,
-                "message": "KAMUCL 1.1.20 session started (darwin arm64)"
+                "message": "MC-Launcher 1.1.20 session started (darwin arm64)"
               },
               {
                 "at": "2026-10-07T20:43:38.869Z",
@@ -335,7 +335,7 @@
               {
                 "at": "2026-10-07T20:41:15.634Z",
                 "unixMs": 1791405675634,
-                "message": "KAMUCL 1.1.20 session started (darwin arm64)"
+                "message": "MC-Launcher 1.1.20 session started (darwin arm64)"
               },
               {
                 "at": "2026-10-07T20:41:17.851Z",
@@ -400,7 +400,7 @@
               {
                 "at": "2026-10-07T20:41:34.868Z",
                 "unixMs": 1791405694868,
-                "message": "KAMUCL 1.1.20 session started (darwin arm64)"
+                "message": "MC-Launcher 1.1.20 session started (darwin arm64)"
               },
               {
                 "at": "2026-10-07T20:41:35.587Z",
@@ -465,7 +465,7 @@
               {
                 "at": "2026-10-07T20:42:26.164Z",
                 "unixMs": 1791405746164,
-                "message": "KAMUCL 1.1.20 session started (darwin arm64)"
+                "message": "MC-Launcher 1.1.20 session started (darwin arm64)"
               },
               {
                 "at": "2026-10-07T20:42:26.832Z",
@@ -530,7 +530,7 @@
               {
                 "at": "2026-10-07T20:43:24.027Z",
                 "unixMs": 1791405804027,
-                "message": "KAMUCL 1.1.20 session started (darwin arm64)"
+                "message": "MC-Launcher 1.1.20 session started (darwin arm64)"
               },
               {
                 "at": "2026-10-07T20:43:24.635Z",
@@ -590,14 +590,14 @@
   "staticParityFile": "MAC_STATIC_PARITY.json",
   "package": [
     {
-      "name": "KAMUCL-1.1.20-mac-arm64.zip",
+      "name": "MC-Launcher-1.1.20-mac-arm64.zip",
       "platform": "darwin",
       "arch": "arm64",
       "bytes": 125935198,
       "sha256": "0b06dd56486a6b0dbe76313a1e2124a4848efa919352f7efd7e3e69805ff4ebe"
     },
     {
-      "name": "KAMUCL-1.1.20-mac-arm64.dmg",
+      "name": "MC-Launcher-1.1.20-mac-arm64.dmg",
       "platform": "darwin",
       "arch": "arm64",
       "bytes": 135777035,
