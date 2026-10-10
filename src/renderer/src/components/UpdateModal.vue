@@ -3,7 +3,7 @@
  * 启动器更新弹窗：发现新版本 / 下载中 / 下载完成 三态。
  * 常驻内测群备用下载提示 + 复制群号；低速 30s 内嵌醒目提示一次。
  */
-import { computed, ref } from 'vue'
+import { computed, ref, watch, onUnmounted } from 'vue'
 import UpdateDialogShell from './UpdateDialogShell.vue'
 import type { ReleaseInfo } from '@shared/types'
 import { QQ_GROUP_HINT } from '@shared/branding'
@@ -47,6 +47,38 @@ async function copyGroup() {
   } catch { /* 剪贴板不可用时静默 */ }
 }
 
+// 下载完成态：5 秒倒计时后自动应用并重启，无需手动操作；可点「稍后」取消
+const AUTO_RESTART_SECONDS = 5
+const countdown = ref(AUTO_RESTART_SECONDS)
+let countdownTimer: ReturnType<typeof setInterval> | undefined
+let firedAuto = false
+watch(
+  () => props.state,
+  (s) => {
+    if (s === 'done') {
+      countdown.value = AUTO_RESTART_SECONDS
+      firedAuto = false
+      countdownTimer = setInterval(() => {
+        if (firedAuto) return
+        countdown.value -= 1
+        if (countdown.value <= 0) {
+          firedAuto = true
+          clearInterval(countdownTimer)
+          emit('installNow')
+        }
+      }, 1000)
+    } else {
+      clearInterval(countdownTimer)
+    }
+  },
+  { immediate: true }
+)
+function cancelAutoRestart() {
+  clearInterval(countdownTimer)
+  firedAuto = true
+}
+onUnmounted(() => clearInterval(countdownTimer))
+
 const bodyHtml = computed(() => renderMarkdownLite((props.release.body || '').replace(/^\s*(?:#{1,4}\s*)?MC-Launcher\s+v?[\d.]+\s*(?:\r?\n|$)/i, '').trim() || '暂无更新说明'))
 const dateText = computed(() => {
   const d = new Date(props.release.publishedAt)
@@ -62,11 +94,11 @@ const sizeText = computed(() => {
 </script>
 
 <template>
-  <UpdateDialogShell :label="rollback ? '版本回退确认' : '启动器更新'" @dismiss="state === 'found' ? emit('later') : state === 'done' ? emit('close') : undefined">
+  <UpdateDialogShell :label="rollback ? '版本回退确认' : '启动器更新'" @dismiss="state === 'found' ? emit('later') : state === 'done' ? (cancelAutoRestart(), emit('close')) : undefined">
     <template #header>
       <div class="upd-head">
         <div><p class="upd-eyebrow">MC-Launcher · {{ rollback ? '版本回退' : '软件更新' }}</p><h3 class="upd-title">{{ state === 'found' ? (rollback ? '回退到' : '发现新版本') : state === 'downloading' ? '正在下载' : '准备安装' }} v{{ release.version }}</h3></div>
-        <button v-if="state !== 'downloading'" class="icon-btn" :aria-label="state === 'found' ? '稍后提醒' : '关闭'" @click="state === 'found' ? emit('later') : emit('close')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+        <button v-if="state !== 'downloading'" class="icon-btn" :aria-label="state === 'found' ? '稍后提醒' : '关闭'" @click="state === 'found' ? emit('later') : (cancelAutoRestart(), emit('close'))"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
       </div>
       <div class="upd-meta"><span>当前 v{{ currentVersion }}</span><span v-if="dateText">{{ dateText }}</span><span v-if="sizeText">{{ sizeText }}</span></div>
     </template>
@@ -82,7 +114,11 @@ const sizeText = computed(() => {
       <p class="muted upd-note">下载进度同时显示在下载中心，支持断点续传。</p>
       <p v-if="slowHint" class="upd-slow">下载速度持续偏低，可以通过下方备用方式获取安装包。</p>
     </template>
-    <p v-else class="upd-done-text">{{ installExplanation }}</p>
+    <p v-else class="upd-done-text">
+      <template v-if="systemInstaller">{{ installExplanation }}</template>
+      <template v-else-if="!firedAuto">{{ countdown }} 秒后自动重启完成更新，替换前会自动备份当前版本…</template>
+      <template v-else>正在应用更新，即将自动重启…</template>
+    </p>
     <details v-if="state !== 'done'" class="upd-help" :open="slowHint || undefined">
       <summary>其他下载方式与安装说明</summary>
       <p class="muted">{{ QQ_GROUP_HINT }}</p>
@@ -93,7 +129,7 @@ const sizeText = computed(() => {
       <div class="upd-actions">
         <template v-if="state === 'found'"><button v-if="!rollback" class="upd-skip" @click="emit('skip')">跳过此版本</button><div class="upd-actions-right"><button class="btn btn-ghost" @click="emit('later')">稍后提醒</button><button class="btn btn-gold" @click="emit('updateNow')">{{ rollback ? '确认回退' : '立即更新' }}</button></div></template>
         <div v-else-if="state === 'downloading'" class="upd-actions-right"><button class="btn btn-ghost" @click="emit('cancelDownload')">取消下载</button></div>
-        <div v-else class="upd-actions-right"><button class="btn btn-ghost" @click="emit('close')">稍后</button><button class="btn btn-gold" @click="emit('installNow')">{{ installAction }}</button></div>
+        <div v-else class="upd-actions-right"><button class="btn btn-ghost" @click="cancelAutoRestart(); emit('close')">稍后</button><button class="btn btn-gold" :disabled="firedAuto" @click="cancelAutoRestart(); emit('installNow')">{{ systemInstaller ? installAction : '立即重启' }}</button></div>
       </div>
     </template>
   </UpdateDialogShell>

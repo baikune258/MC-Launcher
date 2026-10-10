@@ -372,6 +372,33 @@ export async function restoreBackupAndRestart(): Promise<void> {
   await writePendingUpdate({ version: state.backupVersion, publishedAt: '', body: '', assetUrl: '', assetSize: fs.statSync(dest).size, assetName: path.basename(dest) }, dest, await sha256File(dest), 'rollback')
 }
 
+/**
+ * 立即应用已下载的更新并重启（下载完成后自动调用，无需用户手动重启）。
+ * 便携包：校验通过 → 更新助手替换 exe → 自动拉起新版本；当前进程退出。
+ * 非便携/系统安装器：返回 false，保持下次启动时应用。
+ */
+export async function applyUpdateAndRestartNow(): Promise<boolean> {
+  if (process.platform === 'darwin') return applyMacUpdateOnStartup()
+  if (process.platform === 'linux') return applyLinuxUpdateOnStartup()
+  const exe = currentPortableExe()
+  if (!exe) return false
+  const marker = updateMarker(exe)
+  const claim = marker + '.applying'
+  const t = readUpdateTransaction(claim, exe) ?? readUpdateTransaction(marker, exe)
+  if (!t) return false
+  if (t.mode === 'upgrade' && compareSemver(t.release.version, currentVersion()) <= 0) { clearPendingUpdate(); return false }
+  await validateUpdatePayload(t)
+  const oldSha256 = await sha256File(exe)
+  try {
+    if (!readUpdateTransaction(claim, exe)) fs.renameSync(marker, claim)
+  } catch { /* 已在应用中 */ }
+  const helperPid = await spawnUpdater({ oldExe: exe, newExe: t.file, backupDir: backupDirOf(exe), mainPid: process.pid,
+    wrapperPid: process.ppid, stateDir: userDataDir(), transaction: t, oldSha256 })
+  try { atomicUpdateJson(claim, { ...t, helperPid }) } catch (error) { updateLog.warn('更新助手已启动，无法补记进程编号', error) }
+  app.exit(0)
+  return true
+}
+
 /** 校验本地安装包：版本号（文件名解析）与 SHA256（联网比对 Release，离线则 unknown 由用户自担确认） */
 const EXE_VERSION_RE = /^MC-Launcher-(\d+\.\d+\.\d+(?:\.\d+)?)/i
 export async function checkLocalUpdateFile(filePath: string): Promise<LocalUpdateCheck> {

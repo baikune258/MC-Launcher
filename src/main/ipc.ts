@@ -925,6 +925,7 @@ export function registerIpc(getWin: () => BrowserWindow | null): void {
   ipcMain.handle(IPC.updateApply, async (_e, release: import('../shared/types').ReleaseInfo) => {
     await applyUpdate.applyDownloadedUpdate(release)
   })
+  ipcMain.handle(IPC.updateApplyRestart, async () => applyUpdate.applyUpdateAndRestartNow())
   ipcMain.handle(IPC.updateListReleases, () => selfUpdate.listReleases())
   ipcMain.handle(IPC.updateGetState, () => applyUpdate.getUpdateState())
   ipcMain.handle(IPC.updateRestoreBackup, async () => {

@@ -18,6 +18,7 @@ import { backgroundImageEffect } from '@shared/appearancePolicy'
 import { taskProgressPercent } from '@shared/taskProgress'
 import {
   applyUpdate,
+  applyUpdateRestart,
   cancelTask,
   errText,
   exportLaunchLogs,
@@ -310,9 +311,10 @@ async function onUpdateInstallNow() {
   const release = updateModal.release
   if (!release) return
   try {
-    await applyUpdate(release)
+    // 立即应用已下载的更新并自动重启（便携包），无需用户手动重启启动器
+    const applied = await applyUpdateRestart()
     updateModal.open = false
-    toast(updateReadyMessage(), 'success')
+    toast(applied ? `新版本 v${release.version} 正在应用，将自动重启完成更新` : updateReadyMessage(), 'success')
   } catch (e) {
     toast('安装更新失败：' + errText(e), 'error')
     updateModal.open = false

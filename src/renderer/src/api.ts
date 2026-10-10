@@ -341,6 +341,7 @@ export const skipUpdateVersion = (version: string) => invoke<void>(IPC.updateSki
 export const startUpdateDownload = (release: import('@shared/types').ReleaseInfo, mode: 'upgrade' | 'rollback' = 'upgrade') =>
   invoke<{ taskId: string }>(IPC.updateStart, release, mode)
 export const applyUpdate = (release: import('@shared/types').ReleaseInfo) => invoke<void>(IPC.updateApply, release)
+export const applyUpdateRestart = () => invoke<boolean>(IPC.updateApplyRestart)
 export const listUpdateReleases = () => invoke<import('@shared/types').ReleaseInfo[]>(IPC.updateListReleases)
 export const getUpdateState = () => invoke<import('@shared/types').UpdateStateInfo | null>(IPC.updateGetState)
 export const restoreUpdateBackup = () => invoke<void>(IPC.updateRestoreBackup)

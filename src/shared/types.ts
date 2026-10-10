@@ -939,6 +939,7 @@ export const IPC = {
   updateSkip: 'update:skip', // (version: string) => void  跳过此版本（下下个版本再提示）
   updateStart: 'update:start', // (release: ReleaseInfo, mode: 'upgrade'|'rollback') => { taskId: string }  后台下载更新包
   updateApply: 'update:apply', // (release: ReleaseInfo) => void  校验→备份→替换→重启（下载完成后调用）
+  updateApplyRestart: 'update:applyRestart', // () => boolean  立即应用已下载更新并自动重启（更新助手替换 exe 后拉起新版本）
   updateListReleases: 'update:listReleases', // () => ReleaseInfo[]  版本回退候选列表
   updateGetState: 'update:getState', // () => UpdateStateInfo | null  备份还原入口数据源
   updateRestoreBackup: 'update:restoreBackup', // () => void  还原到更新前的版本并重启

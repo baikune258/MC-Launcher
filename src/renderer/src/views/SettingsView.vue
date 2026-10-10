@@ -5,7 +5,7 @@ const ThirdPartyNotices = defineAsyncComponent(() => import('../components/Third
 import {
   addCustomJava,
   applyLocalUpdate,
-  applyPendingUpdate,
+  applyUpdateRestart,
   cancelJavaScan,
   checkUpdate,
   errText,
@@ -259,8 +259,8 @@ async function onRestoreBackup() {
 }
 async function onApplyPending() {
   try {
-    await applyPendingUpdate()
-    toast(updateReadyMessage(), 'success')
+    const applied = await applyUpdateRestart()
+    toast(applied ? '更新已就绪，正在自动重启完成更新…' : updateReadyMessage(), 'success')
   } catch (e) {
     toast('安装失败：' + errText(e), 'error')
   }
