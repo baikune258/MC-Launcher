@@ -1041,6 +1041,8 @@ function applyTheme(theme?: ThemeName, custom?: CustomTheme) {
     { colors: preset.colors, layout: DEFAULT_CUSTOM_THEME.layout },
     selected
   )
+  // 通知主进程：Windows acrylic 背景偶发不随内容切换刷新，需主动触发一次合成重绘
+  window.kamucl?.send('window:theme-applied')
 }
 
 // settings 未加载时按亮色应用；加载完成 / 修改后 watch 触发立即生效

@@ -278,9 +278,28 @@ app.whenReady().then(async () => {
     })
   )
 
+  let lastThemeRefresh = 0
   ipcMain.on('window:minimize', () => win?.minimize())
   ipcMain.on('window:maximize', () => win && toggleMaximize(win))
   ipcMain.on('window:close', () => win?.close())
+  ipcMain.on('window:theme-applied', (event) => {
+    if (event.sender !== win?.webContents || process.platform !== 'win32' || !win || win.isDestroyed()) return
+    // Windows acrylic 背景在内容切换后偶发不刷新（拖动窗口才恢复）。
+    // 主题切换完成时主动触发一次合成重绘：普通窗口做 1px 尺寸抖动，最大化窗口走背景色切换，均不影响窗口几何。
+    const now = Date.now()
+    if (now - lastThemeRefresh < 300) return
+    lastThemeRefresh = now
+    try {
+      if (win.isMaximized()) {
+        win.setBackgroundColor('#00000001')
+        setTimeout(() => { if (!win.isDestroyed()) win.setBackgroundColor('#00000000') }, 32)
+      } else {
+        const b = win.getBounds()
+        win.setBounds({ ...b, width: b.width + 1 })
+        setTimeout(() => { if (!win.isDestroyed()) win.setBounds(b) }, 32)
+      }
+    } catch { /* 窗口状态异常时跳过刷新 */ }
+  })
   ipcMain.handle('window:visibility', event => event.sender === win?.webContents && win.isVisible() && !win.isMinimized())
   ipcMain.on('window:skinEditorQuit',event=>{if(event.sender===win?.webContents&&!skinEditorDirty&&!skinEditorPrefsPending&&!skinEditorBusy)app.quit()})
   ipcMain.on('window:skinEditorDirty',(event,value)=>{if(event.sender===win?.webContents)skinEditorDirty=value===true})
