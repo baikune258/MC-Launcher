@@ -279,7 +279,11 @@ export function parseSha256Sums(text: string): Map<string, string> {
   const map = new Map<string, string>()
   for (const line of text.split(/\r?\n/)) {
     const m = /^([0-9a-f]{64})\s+\*?(.+)$/.exec(line.trim())
-    if (m) map.set(m[2].trim(), m[1].toLowerCase())
+    if (m) {
+      // 兼容带目录前缀的清单（如 release/MC-Launcher-1.1.31.exe），统一按文件 basename 登记，避免校验清单被误拒
+      const key = m[2].trim().split(/[\\/]/).pop()
+      if (key) map.set(key, m[1].toLowerCase())
+    }
   }
   return map
 }
