@@ -92,21 +92,24 @@ function Write-Json($file, $value) {
 }
 try {
   Log 'Applying claimed update on user startup'
-  for ($n = 0; $n -lt 90; $n++) {
+  for ($n = 0; $n -lt 180; $n++) {
     if (-not (Get-Process -Id $mainPid -ErrorAction SilentlyContinue) -and (-not $wrapperPid -or -not (Get-Process -Id $wrapperPid -ErrorAction SilentlyContinue))) { break }
     Start-Sleep -Milliseconds 500
   }
+  Log 'Old process exited; verifying payload'
   if ((Hash-File $newExe) -ne $expected) { throw 'Update payload checksum changed' }
   if ((Hash-File $oldExe) -ne $oldHash) { throw 'Target changed; refusing replacement' }
   New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
   Copy-Item -LiteralPath $newExe -Destination $swap
   if ((Hash-File $swap) -ne $expected) { throw 'Staged copy checksum mismatch' }
   # Replace is atomic on the same volume. It creates the backup without a missing-exe interval.
-  for ($n = 0; $n -lt 60; $n++) {
+  for ($n = 0; $n -lt 120; $n++) {
     if ((Hash-File $oldExe) -ne $oldHash) { throw 'Target changed while waiting; refusing replacement' }
     try { [IO.File]::Replace($swap, $oldExe, $backup); $replaced = $true; break }
-    catch { if ($n -eq 59) { throw }; Start-Sleep -Milliseconds 500 }
+    catch { if ($n -eq 119) { throw ('Replace failed after 60s: ' + $_.Exception.Message) }; Start-Sleep -Milliseconds 500 }
   }
+  if (-not $replaced) { throw 'Replacement did not complete' }
+  Log 'Executable replaced; launching new version'
   $state = @{from=${q(t.from)};to=${q(t.release.version)};time=[DateTime]::UtcNow.ToString('o');backupPath=$backup;backupVersion=${q(t.from)};result='applied'}
   Write-Json (Join-Path $stateDir 'update-state.json') $state
   # The user's startup is continued once, using the original filename/shortcut.

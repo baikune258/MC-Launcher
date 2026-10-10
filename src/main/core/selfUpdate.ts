@@ -257,9 +257,10 @@ export function decideUpdateAction(opts: {
 /** 品牌化起点版本：回退与历史列表的最低版本（2.0.0 起为自有品牌，排除原作者 1.x 版本） */
 export const ROLLBACK_MIN_VERSION = '1.1.22'
 
-/** 版本回退候选：品牌化后的正式 Release（含当前与更旧版本，按发布时间倒序；最低到 2.0.0） */
+/** 版本回退候选：品牌化后的正式 Release，仅含「当前版本以前」的版本（按发布时间倒序；最低到 1.1.22） */
 export async function listReleases(): Promise<ReleaseInfo[]> {
   try {
+    const current = currentVersion()
     const res = await ghFetch(`${apiBase()}/repos/${GITHUB_REPO}/releases?per_page=20`)
     if (!res.ok) { await res.body?.cancel().catch(() => {}); throw new Error(`HTTP ${res.status}`) }
     const list = JSON.parse((await readUpdateBody(res)).toString('utf8')) as GhRelease[]
@@ -267,7 +268,7 @@ export async function listReleases(): Promise<ReleaseInfo[]> {
       .filter((r) => !r.draft && !r.prerelease)
       .map(toReleaseInfo)
       .filter((r): r is ReleaseInfo => !!r && !!r.assetUrl)
-      .filter((r) => compareSemver(r.version, ROLLBACK_MIN_VERSION) >= 0)
+      .filter((r) => compareSemver(r.version, ROLLBACK_MIN_VERSION) >= 0 && compareSemver(r.version, current) < 0)
   } catch (e) {
     updateLog.info('获取历史版本列表失败', e)
     return []
