@@ -183,7 +183,8 @@ export async function checkLatest(force = false): Promise<UpdateCheckResult> {
     return { ok: true, hasUpdate: has, release: cache.latest ?? undefined, fromCache: true }
   }
   try {
-    const res = await ghFetch(`${apiBase()}/repos/${GITHUB_REPO}/releases/latest`, cache?.etag)
+    // 手动强制检查不带旧 ETag，避免命中 304 返回过时缓存；失败时也不静默回退旧缓存伪装"已是最新"
+    const res = await ghFetch(`${apiBase()}/repos/${GITHUB_REPO}/releases/latest`, force ? undefined : cache?.etag)
     if (!res.ok) await res.body?.cancel().catch(() => {})
     if (res.status === 304) {
       // 未变化：刷新缓存时间，沿用上次结果（304 不计限流）
@@ -195,7 +196,7 @@ export async function checkLatest(force = false): Promise<UpdateCheckResult> {
     if (res.status === 403 || res.status === 429) {
       const remain = res.headers.get('x-ratelimit-remaining')
       updateLog.info(`GitHub API 限流（remaining=${remain}），静默降级`)
-      if (cache?.latest !== undefined) {
+      if (!force && cache?.latest !== undefined) {
         const has = !!cache.latest && isNewerVersion(cache.latest.version, current)
         return { ok: true, hasUpdate: has, release: cache.latest ?? undefined, fromCache: true, reason: 'rate-limited' }
       }
@@ -214,7 +215,7 @@ export async function checkLatest(force = false): Promise<UpdateCheckResult> {
     return { ok: true, hasUpdate: has, release: latest ?? undefined }
   } catch (e) {
     updateLog.info('更新检查失败（静默降级）', e)
-    if (cache?.latest !== undefined) {
+    if (!force && cache?.latest !== undefined) {
       const has = !!cache.latest && isNewerVersion(cache.latest.version, current)
       return { ok: true, hasUpdate: has, release: cache.latest ?? undefined, fromCache: true, reason: 'network' }
     }
@@ -253,7 +254,10 @@ export function decideUpdateAction(opts: {
   return 'prompt'
 }
 
-/** 版本回退候选：全部正式 Release（含当前与更旧版本，按发布时间倒序） */
+/** 品牌化起点版本：回退与历史列表的最低版本（2.0.0 起为自有品牌，排除原作者 1.x 版本） */
+export const ROLLBACK_MIN_VERSION = '2.0.0'
+
+/** 版本回退候选：品牌化后的正式 Release（含当前与更旧版本，按发布时间倒序；最低到 2.0.0） */
 export async function listReleases(): Promise<ReleaseInfo[]> {
   try {
     const res = await ghFetch(`${apiBase()}/repos/${GITHUB_REPO}/releases?per_page=20`)
@@ -263,6 +267,7 @@ export async function listReleases(): Promise<ReleaseInfo[]> {
       .filter((r) => !r.draft && !r.prerelease)
       .map(toReleaseInfo)
       .filter((r): r is ReleaseInfo => !!r && !!r.assetUrl)
+      .filter((r) => compareSemver(r.version, ROLLBACK_MIN_VERSION) >= 0)
   } catch (e) {
     updateLog.info('获取历史版本列表失败', e)
     return []

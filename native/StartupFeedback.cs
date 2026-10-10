@@ -206,7 +206,7 @@ sealed class StartupFeedback : Form {
             var panel=new RectangleF(logicalWidth/2f-110,logicalHeight/2f+135,220,86);
             using(var outline=Round(panel,14))using(var fill=new SolidBrush(Color.FromArgb(184,23,32,33)))using(var border=new Pen(Color.FromArgb(36,255,255,255),1)){g.FillPath(fill,outline);g.DrawPath(border,outline);}
             using(var titleFont=new Font("Segoe UI",20,FontStyle.Bold,GraphicsUnit.Pixel))using(var textFont=new Font("Microsoft YaHei UI",12,FontStyle.Regular,GraphicsUnit.Pixel))using(var ink=new SolidBrush(Color.FromArgb(245,248,246)))using(var format=new StringFormat{Alignment=StringAlignment.Center,LineAlignment=StringAlignment.Center}){
-                g.DrawString("KAMUCL",titleFont,ink,new RectangleF(panel.X,panel.Y+10,panel.Width,30),format);
+                g.DrawString("MC-Launcher",titleFont,ink,new RectangleF(panel.X,panel.Y+10,panel.Width,30),format);
                 g.DrawString(caption,textFont,ink,new RectangleF(panel.X+10,panel.Y+44,panel.Width-20,25),format);
             }
         }
