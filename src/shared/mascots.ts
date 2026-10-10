@@ -1,4 +1,4 @@
-export const MASCOTS=[{id:'q3',name:'q3'},{id:'qiqi',name:'qiqi'},{id:'biyuehu',name:'碧月狐'},{id:'hongshu',name:'红叔'},{id:'kamu',name:'卡慕'},{id:'milo',name:'米洛'},{id:'muchuanbei',name:'幕川北'}] as const
+export const MASCOTS=[{id:'q3',name:'q3'},{id:'qiqi',name:'qiqi'},{id:'biyuehu',name:'碧月狐'},{id:'hongshu',name:'红叔'},{id:'kamu',name:'baikun'},{id:'milo',name:'米洛'},{id:'muchuanbei',name:'幕川北'}] as const
 export interface MascotSound { muted:boolean; volume:number }
 export const DEFAULT_MASCOT_SOUND:Readonly<MascotSound>={muted:false,volume:.45}
 export interface MascotState {counts:Record<string,number>;order:string[];sound?:MascotSound}

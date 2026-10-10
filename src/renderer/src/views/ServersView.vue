@@ -299,7 +299,7 @@ async function doLaunch(s: ServerEntry, versionId: string) {
   } finally { launchBusy.value = false }
 }
 
-/** 仅更新 KAMUCL 的实例关联；绝不写回或覆盖 Minecraft 的 servers.dat。 */
+/** 仅更新 MC-Launcher 的实例关联；绝不写回或覆盖 Minecraft 的 servers.dat。 */
 async function onBind(s: ServerEntry, token: string) {
   if (bindingId.value) return
   bindingId.value = s.id

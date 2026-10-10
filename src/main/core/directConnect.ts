@@ -122,7 +122,7 @@ export function startDirectHost(request: DirectHostRequest): Promise<DirectHostS
       signal.throwIfAborted()
       const unique = endpoints.filter((item,index) => endpoints.findIndex(other => endpointAddress(other) === endpointAddress(item)) === index).slice(0,12)
       if (!unique.some(item => item.kind !== 'lan')) messages.push('当前仅可供同一局域网加入，尚无公网房主路径。CGNAT、手机热点、校园网可能限制入站连接；你仍可以加入可达好友的世界。')
-      messages.push('开启房间后需保持 KAMUCL 和游戏运行；退出或关闭局域网世界会断开直连。')
+      messages.push('开启房间后需保持 MC-Launcher 和游戏运行；退出或关闭局域网世界会断开直连。')
       const invitation: DirectInvitation = { format:'KAMUCL-DIRECT', version:1, name:version.id, minecraftVersion:version.mcVersion,
         loader:version.loader, loaderVersion:version.loaderVersion, endpoints:unique, expiresAt:new Date(Date.now() + 24*3600000).toISOString() }
       const state: DirectHostState = { active:true, connections:0, endpoints:unique, invite:unique.length ? encodeInvitation(invitation) : undefined,

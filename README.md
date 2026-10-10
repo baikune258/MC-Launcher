@@ -20,7 +20,7 @@
 
 ## 🌸 功能一览
 
-MC-Launcher 基于 Electron 44.3.0、Vue 和 Three.js，在 KAMUCL v1.1.21（MIT，原作者 kamubaba-i）基础上二次开发。当前交付 Windows x64 和 macOS ARM64；其他平台工程仍在仓库中，验收范围以对应 Release 为准。
+MC-Launcher 由 **baikun258** 开发维护，基于 Electron 44.3.0、Vue 和 Three.js 构建，并在开源项目 KAMUCL v1.1.21（MIT）基础上二次开发（按 MIT 许可保留原作者版权声明）。当前交付 Windows x64 和 macOS ARM64；其他平台工程仍在仓库中，验收范围以对应 Release 为准。
 
 | 模块 | 说明 |
 | --- | --- |
@@ -32,7 +32,7 @@ MC-Launcher 基于 Electron 44.3.0、Vue 和 Three.js，在 KAMUCL v1.1.21（MIT
 | 🔎 社区资源 | 搜索并导入 Modrinth / CurseForge 资源 |
 | 🧁 皮肤衣柜 | 角色预览、皮肤与披风上传、历史记录 |
 | 🤝 联机 | FRP、VoxLink、Terracotta 和好友直连 |
-| 🛠️ MOD 面板 | 通过 KAMUCL Bridge 实时读取与修改 MOD 参数 |
+| 🛠️ MOD 面板 | 通过 MC-Launcher Bridge 实时读取与修改 MOD 参数 |
 | ✨ 个性化 | 主题、背景、快捷键、插件和启动页缩略图 |
 | 🩺 诊断 | 下载任务、日志导出、启动诊断、更新与回滚 |
 
@@ -69,7 +69,7 @@ release/MC-Launcher-<version>.exe
 
 ### 直接运行（Mac ARM64）
 
-要求 macOS 13 或更新版本及 Apple Silicon。打开 ARM64 DMG，把 `KAMUCL.app` 拖入“应用程序”，推出镜像后运行；或解压 ARM64 ZIP，把应用移入“应用程序”再运行。不要选择 Intel 包，也不要在只读 DMG 内执行更新。
+要求 macOS 13 或更新版本及 Apple Silicon。打开 ARM64 DMG，把 `MC-Launcher.app` 拖入“应用程序”，推出镜像后运行；或解压 ARM64 ZIP，把应用移入“应用程序”再运行。不要选择 Intel 包，也不要在只读 DMG 内执行更新。
 
 当前包使用 ad-hoc 签名，未做 Apple Developer ID 签名与公证；如系统要求确认，请在“系统设置 → 隐私与安全性”按系统提示处理，不需要关闭整个系统的安全检查。
 
@@ -121,7 +121,7 @@ npx electron-builder --win portable
 
 代码协作采用 Fork、功能分支和 Pull Request。提交标题、正文、类型前缀与检查要求见[提交规范](docs/CONTRIBUTING.md)；开发检查清单见[开发指南](docs/DEVELOPMENT.md#9-提交前检查清单)。
 
-### 🌉 构建 KAMUCL Bridge
+### 🌉 构建 MC-Launcher Bridge
 
 Bridge 是给 Fabric 实例使用的本机桥接 MOD，实例可按需启用；完整生产构建要求提前生成内置 JAR。需要完整 JDK 17+：
 
@@ -139,7 +139,7 @@ src/main/       Electron 主进程、Minecraft 管理与 IPC
 src/preload/    渲染进程安全桥接 API
 src/renderer/   Vue 页面、组件与主题
 src/shared/     共用类型、协议和常量
-bridge/         KAMUCL Bridge MOD（Fabric）
+bridge/         MC-Launcher Bridge MOD（Fabric）
 native/         Windows 原生辅助程序（材质、聚焦、启动反馈）
 scripts/        构建、发布与回归测试脚本
 tests/          自动化测试
@@ -148,7 +148,7 @@ docs/           功能说明、构建说明与版本验证记录
 
 ## 💾 数据、日志与隐私
 
-启动器运行数据默认保存在 Windows 的 `%APPDATA%\KAMUCL`（macOS 为 `~/Library/Application Support/KAMUCL`），包括账号、设置、缓存和日志。**Windows 便携版（EXE/ZIP）会把运行文件与缓存解压到 EXE 同目录的 `KAMUCL-runtime`，不写入系统盘**，删除整个文件夹即可干净卸载。反馈问题时，请先隐藏账号令牌、个人路径和公网 IP。
+启动器数据全部跟随安装目录：Windows 便携版（EXE/ZIP）的账号、设置、缓存、日志和运行组件都保存在 EXE 同目录（`MC-Launcher-data` 与 `KAMUCL-runtime`），**不写入系统盘**；首次启动会自动清理旧版遗留的系统盘数据，删除整个文件夹即可干净卸载。反馈问题时，请先隐藏账号令牌、个人路径和公网 IP。
 
 ## ❓ 常见问题
 
@@ -182,7 +182,7 @@ docs/           功能说明、构建说明与版本验证记录
 
 ## 💌 许可证
 
-项目的 `package.json` 许可字段为 `SEE LICENSE IN LICENSE`。原始 KAMUCL 贡献适用 [LICENSE](LICENSE) 中限定范围的 MIT 条款；第三方代码保留各自许可，请同时阅读 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)、`licenses/` 和[对应源码说明](docs/CORRESPONDING_SOURCE.md)，以具体条件为准。
+项目的 `package.json` 许可字段为 `SEE LICENSE IN LICENSE`。原始 KAMUCL 贡献（kamubaba-i）适用 [LICENSE](LICENSE) 中限定范围的 MIT 条款；第三方代码保留各自许可，请同时阅读 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)、`licenses/` 和[对应源码说明](docs/CORRESPONDING_SOURCE.md)，以具体条件为准。
 
 <div align="center">
 

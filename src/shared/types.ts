@@ -1,5 +1,5 @@
 /**
- * KAMUCL 前后端共享类型与 IPC 契约
+ * MC-Launcher 前后端共享类型与 IPC 契约
  * 主进程 (src/main) 与渲染进程 (src/renderer) 都必须遵守本文件定义。
  */
 
@@ -190,7 +190,7 @@ export interface JavaInfo {
   vendor?: string
   /** 来源：自动扫描 / 手动添加 */
   source?: 'auto' | 'manual'
-  /** 自动发现入口，例如注册表、PATH、KAMUCL Runtime、本地磁盘。 */
+  /** 自动发现入口，例如注册表、PATH、MC-Launcher Runtime、本地磁盘。 */
   sourceDetail?: string
 }
 
@@ -462,7 +462,7 @@ export interface ReleaseInfo {
   assetUrl: string
   /** 资产文件大小（字节） */
   assetSize: number
-  /** 资产文件名（KAMUCL-x.y.z.exe） */
+  /** 资产文件名（MC-Launcher-x.y.z.exe） */
   assetName: string
 }
 
@@ -569,7 +569,7 @@ export interface BackgroundSettings {
 export type ImageFit = 'fill' | 'fit' | 'crop'
 
 export interface LaunchThumbnailSettings {
-  /** KAMUCL userData 受管资源路径；空字符串使用内置轮播。 */
+  /** MC-Launcher userData 受管资源路径；空字符串使用内置轮播。 */
   image: string
   /** Ordered managed carousel images; absent means migrate legacy `image`. */
   images?: string[]
@@ -1184,7 +1184,7 @@ export interface ServerEntry {
   minecraftVersion?: string
   loader?: LoaderName
   loaderVersion?: string
-  /** KAMUCL 一键启动该条目的时间；servers.dat 本身不包含游玩时间。 */
+  /** MC-Launcher 一键启动该条目的时间；servers.dat 本身不包含游玩时间。 */
   lastUsedAt?: string
   lastSeenAt?: string
   source?: 'launcher' | 'minecraft'

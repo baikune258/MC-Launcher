@@ -42,7 +42,7 @@ async function writeManagedImage(encoded: EncodedManagedImage, destinationDirect
   await fs.promises.mkdir(destinationDirectory, { recursive: true })
   const destinationStat = await fs.promises.lstat(destinationDirectory)
   if (!destinationStat.isDirectory() || destinationStat.isSymbolicLink()) {
-    throw new Error('KAMUCL 图片缓存目录不安全')
+    throw new Error('MC-Launcher 图片缓存目录不安全')
   }
   const name = `${crypto.randomUUID()}${encoded.extension}`
   const destination = path.join(destinationDirectory, name)

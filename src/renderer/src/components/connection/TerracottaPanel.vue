@@ -191,7 +191,7 @@ onUnmounted(() => { offEvent?.() })
         <div class="op-card">
           <h3>创建房间</h3>
           <p class="connection-muted">先启动游戏并对局域网开放世界；陶瓦会自动完成其余工作，房间码会出现在上方「连接状态」。</p>
-          <label class="connection-field">游戏内名字<input data-ui="TerracottaPanel:6810d6fb09db" v-model="playerName" class="input" maxlength="16" placeholder="可选，默认 KAMUCL" /></label>
+          <label class="connection-field">游戏内名字<input data-ui="TerracottaPanel:6810d6fb09db" v-model="playerName" class="input" maxlength="16" placeholder="可选，默认 MC-Launcher" /></label>
           <div class="connection-actions">
             <button data-ui="TerracottaPanel:f0d7559a0af1" class="btn btn-gold main-btn" :disabled="busy || status?.running || !status?.binaryReady" @click="mode = 'host'; start()">{{ busy && mode === 'host' ? '处理中…' : '创建陶瓦房间' }}</button>
           </div>

@@ -16,7 +16,7 @@ import { downloadFile } from './download'
 import { fileHash } from './fileHash'
 const plans=new Map<string,ModMigrationPlan>(),running=new Set<string>()
 const MR='https://api.modrinth.com/v2'
-async function post(url:string,body:unknown,headers:Record<string,string>={}){const r=await httpFetch(url,{method:'POST',headers:{'Content-Type':'application/json','User-Agent':'KAMUCL (github.com/kamubaba-i/KAMUCL)',...headers},body:JSON.stringify(body),signal:AbortSignal.timeout(20000)});if(!r.ok)throw new Error('社区查询失败 HTTP '+r.status);return r.json() as Promise<any>}
+async function post(url:string,body:unknown,headers:Record<string,string>={}){const r=await httpFetch(url,{method:'POST',headers:{'Content-Type':'application/json','User-Agent':'MC-Launcher (github.com/baikune258/MC-Launcher)',...headers},body:JSON.stringify(body),signal:AbortSignal.timeout(20000)});if(!r.ok)throw new Error('社区查询失败 HTTP '+r.status);return r.json() as Promise<any>}
 export function compatibleFile(file:CommunityFile,mc:string,loader:string){return !!file.url&&/^https:\/\//.test(file.url)&&/^[a-f0-9]{40}$/i.test(file.sha1||'')&&file.gameVersions.includes(mc)&&file.loaders.includes(loader as LoaderName)&&/\.jar$/i.test(file.fileName)&&path.basename(file.fileName)===file.fileName&&!/[\\/:\0]/.test(file.fileName)}
 export async function planModMigration(sourceId:string,folder:string,mcVersion:string,loader:LoaderName):Promise<ModMigrationPlan>{
  requireResourceVersion(sourceId);if(!/^[a-zA-Z0-9._-]{1,40}$/.test(mcVersion)||!['fabric','forge','neoforge','quilt'].includes(loader))throw new Error('请选择有效的游戏版本与加载器')

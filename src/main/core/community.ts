@@ -37,7 +37,7 @@ export type ProgressEmit = (e: ProgressEvent) => void
 
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 
-const UA = { 'User-Agent': 'KAMUCL/0.4.0' }
+const UA = { 'User-Agent': 'MC-Launcher/0.4.0' }
 const TIMEOUT = 30000
 const requestSignal=new AsyncLocalStorage<AbortSignal>()
 export const withCommunitySignal=<T>(signal:AbortSignal|undefined,run:()=>Promise<T>):Promise<T>=>signal?requestSignal.run(signal,run):run()
@@ -670,7 +670,7 @@ export async function communityDownload(
     : String(target.folder).trim()
   if (!requested) throw new Error('目标游戏文件夹不能为空')
   const registered = getSettings().folders.find(folder => samePath(folder.path, requested))
-  if (!registered && (target.kind === 'modpack' || target.folder !== undefined)) throw new Error('目标游戏文件夹未在 KAMUCL 中登记')
+  if (!registered && (target.kind === 'modpack' || target.folder !== undefined)) throw new Error('目标游戏文件夹未在 MC-Launcher 中登记')
   const folder = canonicalPath(registered?.path ?? requested)
   return withGameFolder(folder, () => communityDownloadInFolder(file, { ...target, folder }, emit, onDone, signal))
 }
