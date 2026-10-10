@@ -1000,7 +1000,7 @@ async function onRemovePlugin(p: PluginInfo) {
         <div data-ui="SettingsView:67dc06128cde" class="card group group-inline">
           <div data-ui="SettingsView:f4183aab56c6">
             <h3 data-ui="SettingsView:984f729eb605" class="group-title">启动后关闭启动器</h3>
-            <p data-ui="SettingsView:b44d69e716b0" class="muted group-hint">游戏成功启动后自动退出 KAMUCL</p>
+            <p data-ui="SettingsView:b44d69e716b0" class="muted group-hint">游戏成功启动后自动退出启动器</p>
           </div>
           <label data-ui="SettingsView:9a7401ab1a9a" class="switch">
             <input data-ui="SettingsView:f2f1ffcd2e84"
@@ -1077,7 +1077,7 @@ async function onRemovePlugin(p: PluginInfo) {
           </div>
           </details>
           <p data-ui="SettingsView:108b83a3465d" class="muted group-hint">
-            更新包发布在 GitHub Releases；下载较慢时可到 KAMUCL 内测群（{{ store.settings.qqGroupNumber?.trim() || QQ_GROUP_NUMBER }}）获取，群内文件与 GitHub 版本一致。
+            更新包发布在 GitHub Releases；下载较慢时可到 MC-Launcher 内测群（{{ store.settings.qqGroupNumber?.trim() || QQ_GROUP_NUMBER }}）获取，群内文件与 GitHub 版本一致。
           </p>
         </div>
       </details>

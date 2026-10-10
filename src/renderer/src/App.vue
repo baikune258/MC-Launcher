@@ -1255,11 +1255,11 @@ onUnmounted(() => {
       <!-- Logo 区 -->
       <div data-ui="App:fc5fc8ba7e96" class="logo-area">
         <div class="brand-slot">
-        <button class="brand-avatar" :class="{'avatar-open':mascotOpen&&mascotReady,'avatar-preparing':mascotOpen&&!mascotReady}" :tabindex="mascotOpen?-1:0" aria-label="打开卡慕互动彩蛋" :aria-expanded="mascotOpen" :aria-busy="mascotOpen&&!mascotReady" :title="mascotOpen&&!mascotReady?'正在准备卡慕…':'打开卡慕互动彩蛋'" @click="openMascots"><img data-ui="App:0f39bd9dbfd2" class="brand-head" :src="brandHead" alt="KaMuaMua 的 Minecraft 头像" /></button>
+        <button class="brand-avatar" :class="{'avatar-open':mascotOpen&&mascotReady,'avatar-preparing':mascotOpen&&!mascotReady}" :tabindex="mascotOpen?-1:0" aria-label="打开baikun互动彩蛋" :aria-expanded="mascotOpen" :aria-busy="mascotOpen&&!mascotReady" :title="mascotOpen&&!mascotReady?'正在准备baikun…':'打开baikun互动彩蛋'" @click="openMascots"><img data-ui="App:0f39bd9dbfd2" class="brand-head" :src="brandHead" alt="baikun 的 Minecraft 头像" /></button>
         <MascotStage v-if="mascotOpen" ref="mascotRef" :focus-on-ready="mascotKeyboard" @ready="mascotReady=true" @activity="mascotBusy=$event" @render-mode="mascotSoftware=$event" @close="closeMascots"/>
         </div>
         <div data-ui="App:7494cda29e47" class="logo-text">
-          <span data-ui="App:c396a9ff34cb" class="logo-name">KAMUCL</span>
+          <span data-ui="App:c396a9ff34cb" class="logo-name">MC-Launcher</span>
           <span data-ui="App:31accf043a9a" class="logo-version">v{{ appVersion }}</span>
         </div>
       </div>
