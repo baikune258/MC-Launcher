@@ -261,7 +261,7 @@ let activeDownload: { version: string; handle: UpdateDownloadHandle } | null = n
  * 完成后强制 SHA256 校验。低速 30s 通过 emit 发一次内测群提示。
  */
 export function startUpdateDownload(release: ReleaseInfo, settings: UpdateSourceSettings, mode: 'upgrade' | 'rollback'): UpdateDownloadHandle {
-  if (process.platform === 'darwin' && !macUpdateSupported()) throw new Error('请将 KAMUCL.app 拖入可写的应用程序目录后再更新')
+  if (process.platform === 'darwin' && !macUpdateSupported()) throw new Error('请将 MC-Launcher.app 拖入可写的应用程序目录后再更新')
   if (!trustedUpdateRelease(release)) throw new Error('更新来源无效，请重新检查官方版本')
   if (activeDownload) {
     if (activeDownload.version === release.version) return activeDownload.handle
@@ -273,7 +273,7 @@ export function startUpdateDownload(release: ReleaseInfo, settings: UpdateSource
   // Keep the previous ready update until its replacement has been fully verified.
   const updateDir = path.join(updateDirOf(exe), release.version)
   fs.mkdirSync(updateDir, { recursive: true })
-  const dest = path.join(updateDir, release.assetName || `KAMUCL-${release.version}.exe`)
+  const dest = path.join(updateDir, release.assetName || `MC-Launcher-${release.version}.exe`)
 
   const task = registerTask(`${mode === 'rollback' ? '回退' : '下载'}启动器 v${release.version}`, 'download')
   const urls = updateDownloadCandidates(release.assetUrl, settings)
@@ -367,20 +367,20 @@ export async function restoreBackupAndRestart(): Promise<void> {
   if (!state || !exe) throw new Error('没有可用的备份')
   if (process.platform === 'darwin') return stageMacBackup(state.backupPath, state.backupVersion)
   if (process.platform === 'linux') return stageLinuxBackup(state.backupPath, state.backupVersion)
-  const dest = path.join(updateDirOf(exe), randomUUID(), `KAMUCL-${state.backupVersion}.exe`)
+  const dest = path.join(updateDirOf(exe), randomUUID(), `MC-Launcher-${state.backupVersion}.exe`)
   fs.mkdirSync(path.dirname(dest), { recursive: true }); fs.copyFileSync(state.backupPath, dest)
   await writePendingUpdate({ version: state.backupVersion, publishedAt: '', body: '', assetUrl: '', assetSize: fs.statSync(dest).size, assetName: path.basename(dest) }, dest, await sha256File(dest), 'rollback')
 }
 
 /** 校验本地安装包：版本号（文件名解析）与 SHA256（联网比对 Release，离线则 unknown 由用户自担确认） */
-const EXE_VERSION_RE = /^KAMUCL-(\d+\.\d+\.\d+(?:\.\d+)?)/i
+const EXE_VERSION_RE = /^MC-Launcher-(\d+\.\d+\.\d+(?:\.\d+)?)/i
 export async function checkLocalUpdateFile(filePath: string): Promise<LocalUpdateCheck> {
   const fileName = path.basename(filePath)
   const st = fs.statSync(filePath)
   const m = EXE_VERSION_RE.exec(fileName)
   const version = m?.[1] ?? ''
-  if (process.platform === 'darwin' && (!version || fileName !== updateAssetName(version))) throw new Error('请选择当前 Mac 架构的 KAMUCL-版本-mac-' + process.arch + '.zip')
-  if (process.platform === 'linux' && (!version || fileName !== updateAssetName(version))) throw new Error('请选择当前 Linux 架构及安装方式的 KAMUCL 更新包')
+  if (process.platform === 'darwin' && (!version || fileName !== updateAssetName(version))) throw new Error('请选择当前 Mac 架构的 MC-Launcher-版本-mac-' + process.arch + '.zip')
+  if (process.platform === 'linux' && (!version || fileName !== updateAssetName(version))) throw new Error('请选择当前 Linux 架构及安装方式的 MC-Launcher 更新包')
   const current = currentVersion()
   const versionOk = !!version && compareSemver(version, current) >= 0
   let sha: LocalUpdateCheck['sha256'] = 'unknown'

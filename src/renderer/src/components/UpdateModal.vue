@@ -47,7 +47,7 @@ async function copyGroup() {
   } catch { /* 剪贴板不可用时静默 */ }
 }
 
-const bodyHtml = computed(() => renderMarkdownLite((props.release.body || '').replace(/^\s*(?:#{1,4}\s*)?KAMUCL\s+v?[\d.]+\s*(?:\r?\n|$)/i, '').trim() || '暂无更新说明'))
+const bodyHtml = computed(() => renderMarkdownLite((props.release.body || '').replace(/^\s*(?:#{1,4}\s*)?MC-Launcher\s+v?[\d.]+\s*(?:\r?\n|$)/i, '').trim() || '暂无更新说明'))
 const dateText = computed(() => {
   const d = new Date(props.release.publishedAt)
   if (Number.isNaN(d.getTime())) return ''
@@ -86,7 +86,7 @@ const sizeText = computed(() => {
     <details v-if="state !== 'done'" class="upd-help" :open="slowHint || undefined">
       <summary>其他下载方式与安装说明</summary>
       <p class="muted">{{ QQ_GROUP_HINT }}</p>
-      <div class="upd-qq-row"><span>内测群 {{ qqGroup }}</span><button class="btn btn-ghost btn-sm" @click="copyGroup">{{ copied ? '已复制' : '复制群号' }}</button></div>
+      <div v-if="qqGroup" class="upd-qq-row"><span>内测群 {{ qqGroup }}</span><button class="btn btn-ghost btn-sm" @click="copyGroup">{{ copied ? '已复制' : '复制群号' }}</button></div>
       <p class="muted">如果旧桌面快捷方式失效，请重新指向更新后的文件。</p>
     </details>
     <template #footer>

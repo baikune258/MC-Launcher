@@ -435,10 +435,10 @@ async function copyAddress(s: ServerEntry) {
           <h3 class="modal-title">删除服务器</h3>
           <p data-ui="ServersView:76f7cd862f50" class="confirm-text">
             <template v-if="delModal.batch">
-              确定要从 KAMUCL 删除所选的 {{ selectedCount }} 个服务器吗？这只会删除启动器记录，不会修改 Minecraft 的 servers.dat；下次同步时，游戏内仍存在的条目可能再次出现。
+              确定要从 MC-Launcher 删除所选的 {{ selectedCount }} 个服务器吗？这只会删除启动器记录，不会修改 Minecraft 的 servers.dat；下次同步时，游戏内仍存在的条目可能再次出现。
             </template>
             <template v-else>
-              确定要从 KAMUCL 删除「{{ publicName(delModal.target) }}」吗？这只会删除启动器记录，不会修改 Minecraft 的 servers.dat；下次同步时，游戏内仍存在的条目可能再次出现。
+              确定要从 MC-Launcher 删除「{{ publicName(delModal.target) }}」吗？这只会删除启动器记录，不会修改 Minecraft 的 servers.dat；下次同步时，游戏内仍存在的条目可能再次出现。
             </template>
           </p>
           <div class="modal-actions">

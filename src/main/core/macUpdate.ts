@@ -48,7 +48,7 @@ export function blockedMacVersion(): string | undefined {
   return (readMacUpdate(claim()) ?? readMacUpdate(claim() + '.failed'))?.release.version
 }
 export async function stageMacUpdate(release: ReleaseInfo, file: string, sha256: string, mode: UpdateTransaction['mode']): Promise<void> {
-  if (!macUpdateSupported()) throw new Error('请将 KAMUCL.app 拖入可写的应用程序目录后再更新')
+  if (!macUpdateSupported()) throw new Error('请将 MC-Launcher.app 拖入可写的应用程序目录后再更新')
   if (path.basename(file) !== updateAssetName(release.version) || !inside(macUpdateDir(), file)) throw new Error('请选择与当前 Mac 架构一致的官方 ZIP 包')
   const t: UpdateTransaction = { schema: 1, id: randomUUID(), target: macAppTarget()!, file, sha256, size: fs.statSync(file).size, from: currentVersion(), release, mode }
   await validateUpdatePayload(t)

@@ -217,7 +217,7 @@ function confirmRollback() {
   store.updatePrompt = { release, rollback: true }
 }
 function releaseSummary(body: string): string {
-  const first = (body || '').split(/\r?\n/).map((s) => s.replace(/^(?:#+|[-*])\s*/, '').trim()).filter(s => s && !/^KAMUCL\s+v?[\d.]+$/i.test(s))[0] ?? ''
+  const first = (body || '').split(/\r?\n/).map((s) => s.replace(/^(?:#+|[-*])\s*/, '').trim()).filter(s => s && !/^MC-Launcher\s+v?[\d.]+$/i.test(s))[0] ?? ''
   return first.length > 60 ? first.slice(0, 60) + '…' : first
 }
 function releaseDate(value: string): string {

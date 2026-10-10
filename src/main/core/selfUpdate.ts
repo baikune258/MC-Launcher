@@ -155,7 +155,7 @@ async function ghFetch(url: string, etag?: string, signal?: AbortSignal): Promis
         signal: deadline.signal,
         headers: {
           Accept: 'application/vnd.github+json',
-          'User-Agent': 'KAMUCL-Launcher',
+          'User-Agent': 'MC-Launcher',
           ...(etag ? { 'If-None-Match': etag } : {})
         }
       }, undefined, undefined, async next => validateUpdateDownloadUrl(next, isolatedUpdateTest()))
@@ -289,7 +289,7 @@ export async function fetchSha256Sums(releaseAssetUrlHint?: string, fetcher: typ
     try {
       signal?.throwIfAborted()
       const readSignal = deadline.signal
-      const res = fetcher === ghFetch ? await downloadFetch(url, { signal: readSignal, headers: { 'User-Agent': 'KAMUCL-Launcher', 'accept-encoding': 'identity' } }, undefined, undefined,
+      const res = fetcher === ghFetch ? await downloadFetch(url, { signal: readSignal, headers: { 'User-Agent': 'MC-Launcher', 'accept-encoding': 'identity' } }, undefined, undefined,
         async next => validateUpdateDownloadUrl(next, isolatedUpdateTest())) : await fetcher(url, undefined, readSignal)
       if (!res.ok) { await res.body?.cancel().catch(() => {}); return null }
       const sums = parseSha256Sums((await readUpdateBody(res, signal)).toString('utf8'))

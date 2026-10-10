@@ -81,11 +81,11 @@ export async function loadEnabledPlugins(): Promise<void> {
       el.src = `kamucl-plugin://${encodeURIComponent(plugin.id)}/main.js`
       el.dataset.kamuclPlugin = plugin.id
       el.onload = () => {
-        console.info(`[KAMUCL] 插件已加载：${plugin.id}`)
+        console.info(`[MC-Launcher] 插件已加载：${plugin.id}`)
         resolve()
       }
       el.onerror = () => {
-        console.warn(`[KAMUCL] 插件加载失败：${plugin.id}`)
+        console.warn(`[MC-Launcher] 插件加载失败：${plugin.id}`)
         resolve()
       }
       document.head.appendChild(el)

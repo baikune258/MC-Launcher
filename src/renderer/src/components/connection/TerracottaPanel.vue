@@ -152,7 +152,7 @@ onUnmounted(() => { offEvent?.() })
       <div data-ui="TerracottaPanel:206e7b16e50e" v-if="hosting && status?.room" class="room-card" :class="{ ok: status.phase === 'ready' }">
         <p data-ui="TerracottaPanel:1bd0e99be803" class="room-label">房间码（发给好友）</p>
         <p data-ui="TerracottaPanel:56648d11bc2e" class="room-code"><code>{{ status.room }}</code><button data-ui="TerracottaPanel:20b2d500a6d2" class="btn btn-ghost copy-mini" :disabled="!status.room" @click="copy(status.room)">复制房间码</button></p>
-        <p class="connection-muted">把 U/ 开头的房间码发给好友（官方四段格式）。好友既可以用 KAMUCL 加入，也可以在陶瓦联机官方工具里输入。</p>
+        <p class="connection-muted">把 U/ 开头的房间码发给好友（官方四段格式）。好友既可以用 MC-Launcher 加入，也可以在陶瓦联机官方工具里输入。</p>
         <div class="connection-actions"><button class="btn btn-ghost" :disabled="busy" @click="stop">关闭房间</button></div>
       </div>
 
