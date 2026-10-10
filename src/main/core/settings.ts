@@ -74,6 +74,33 @@ function defaults(): Settings {
   }
 }
 
+/** 便携版：游戏目录跟随软件安装位置（PCL 风格）。旧默认目录没有已装版本时自动切换到 EXE 旁 .minecraft。 */
+export function migratePortableGameFolderToAppDir(): void {
+  const portable = process.env.PORTABLE_EXECUTABLE_FILE
+  if (!portable) return
+  const cur = getSettings()
+  const legacy = path.join(app.getPath('appData'), '.minecraft')
+  if (path.resolve(cur.activeFolder) !== path.resolve(legacy)) return // 用户已自定义，保持不动
+  let used = false
+  try {
+    const versions = path.join(legacy, 'versions')
+    used = fs.existsSync(versions) && fs.readdirSync(versions).length > 0
+  } catch { /* 目录不可读视为空 */ }
+  if (used) return // 旧目录已有游戏数据，不搬移（避免破坏存档/模组）
+  const target = path.join(path.dirname(portable), '.minecraft')
+  if (path.resolve(target) === path.resolve(legacy)) return
+  try {
+    fs.mkdirSync(target, { recursive: true })
+    const folders = cur.folders.map((f) =>
+      path.resolve(f.path) === path.resolve(legacy) ? { ...f, path: target, name: '默认文件夹' } : f
+    )
+    if (!folders.some((f) => path.resolve(f.path) === path.resolve(target))) {
+      folders.push({ path: target, name: '默认文件夹', isDefault: false })
+    }
+    saveSettings({ folders, activeFolder: target, gameDir: target })
+  } catch { /* 切换失败不阻断启动，用户可在设置中手动更改 */ }
+}
+
 /** 配置不兼容时重置为默认（原文件先备份为 settings.backup-时间戳.json，可人工找回） */
 export function resetSettingsToDefaults(): void {
   const file = settingsFile()

@@ -14,7 +14,7 @@ import {
   flushLauncherLogSync,
   logScope
 } from './core/launcherLog'
-import { getSettings, migrateLegacyAppearanceAssets } from './core/settings'
+import { getSettings, migrateLegacyAppearanceAssets, migratePortableGameFolderToAppDir } from './core/settings'
 import { windowAppearance } from './windowAppearance'
 import { applyNativeAppearance } from './nativeAppearance'
 import { loadWindowState, trackWindowState, applyMaximized, toggleMaximize, restoreWindowBounds } from './windowState'
@@ -240,6 +240,12 @@ app.whenReady().then(async () => {
     await migrateLegacyAppearanceAssets()
   } catch (error) {
     launcherLogWarn('appearance', '旧版外观资源迁移失败，不阻断启动', error)
+  }
+  try {
+    // 便携版：游戏目录跟随软件安装位置（PCL 风格）
+    migratePortableGameFolderToAppDir()
+  } catch (error) {
+    launcherLogWarn('main', '游戏目录便携迁移失败，不阻断启动', error)
   }
   protocol.handle('kamucl-asset', (request) => {
     if (request.method !== 'GET') return new Response('Method Not Allowed', { status: 405 })
