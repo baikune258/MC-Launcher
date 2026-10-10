@@ -48,7 +48,7 @@ test('launch combo lives in the banner and owns the launch chain (1.0.18 还原�
 })
 
 test('creator card uses theme tokens, keyboard focus and correct external Bilibili link', () => {
-  assert.match(creator, /href="https:\/\/space\.bilibili\.com\/9596327"/)
+  assert.match(creator, /href="https:\/\/github\.com\/baikune258\/MC-Launcher"/)
   assert.match(creator, /target="_blank"/)
   assert.match(creator, /rel="noopener noreferrer"/)
   assert.match(creator, /aria-label="访问卡慕/)

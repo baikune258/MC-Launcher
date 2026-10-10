@@ -25,7 +25,7 @@ test('Mac updater rejects foreign roots and escaping symlinks before extraction'
 })
 test('Mac update assets select architecture-specific ZIP while preserving Windows EXE',async()=>{
   const {updateAssetName}=await load('src/main/core/updateTrust.ts',os.tmpdir())
-  assert.equal(updateAssetName('1.1.5','darwin','arm64'),'KAMUCL-1.1.5-mac-arm64.zip')
-  assert.equal(updateAssetName('1.1.5','darwin','x64'),'KAMUCL-1.1.5-mac-x64.zip')
-  assert.equal(updateAssetName('1.1.5','win32','x64'),'KAMUCL-1.1.5.exe')
+  assert.equal(updateAssetName('1.1.5','darwin','arm64'),'MC-Launcher-1.1.5-mac-arm64.zip')
+  assert.equal(updateAssetName('1.1.5','darwin','x64'),'MC-Launcher-1.1.5-mac-x64.zip')
+  assert.equal(updateAssetName('1.1.5','win32','x64'),'MC-Launcher-1.1.5.exe')
 })

@@ -29,7 +29,7 @@ test('Linux artifact publication requires the current exact builder output and p
     const builder = path.join(root, 'current-builder'), release = path.join(root, 'release')
     fs.mkdirSync(builder); fs.mkdirSync(release)
     const names = linuxArtifactNames('1.1.11', 'x64', 'AppImage'), payload = Buffer.from('synthetic package fixture; not a native package')
-    fs.writeFileSync(path.join(builder, 'KAMUCL-1.1.10-linux-x86_64.AppImage'), Buffer.from('old builder output'))
+    fs.writeFileSync(path.join(builder, 'MC-Launcher-1.1.10-linux-x86_64.AppImage'), Buffer.from('old builder output'))
     assert.throws(() => publishLinuxArtifact(builder, release, names), /ENOENT/)
     assert.deepEqual(fs.readdirSync(release), [])
     fs.writeFileSync(path.join(builder, names.builderName), payload, { mode: 0o755 })
