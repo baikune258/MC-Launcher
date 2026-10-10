@@ -14,7 +14,7 @@ import {
   flushLauncherLogSync,
   logScope
 } from './core/launcherLog'
-import { getSettings, migrateLegacyAppearanceAssets, migratePortableGameFolderToAppDir } from './core/settings'
+import { getSettings, migrateLegacyAppearanceAssets, migratePortableGameFolderToAppDir, cleanupLegacyGameFolder } from './core/settings'
 import { windowAppearance } from './windowAppearance'
 import { applyNativeAppearance } from './nativeAppearance'
 import { loadWindowState, trackWindowState, applyMaximized, toggleMaximize, restoreWindowBounds } from './windowState'
@@ -244,6 +244,8 @@ app.whenReady().then(async () => {
   try {
     // 便携版：游戏目录跟随软件安装位置（PCL 风格）
     migratePortableGameFolderToAppDir()
+    // 旧默认游戏目录无真实内容时自动清理（有游戏数据不删，避免误删）
+    cleanupLegacyGameFolder()
   } catch (error) {
     launcherLogWarn('main', '游戏目录便携迁移失败，不阻断启动', error)
   }

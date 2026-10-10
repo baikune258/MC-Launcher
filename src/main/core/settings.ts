@@ -101,6 +101,22 @@ export function migratePortableGameFolderToAppDir(): void {
   } catch { /* 切换失败不阻断启动，用户可在设置中手动更改 */ }
 }
 
+/** 清理旧默认游戏目录残留：仅在旧目录没有真实游戏内容时删除（空壳/空子目录），避免误删用户数据或其他启动器数据。 */
+export function cleanupLegacyGameFolder(): void {
+  const portable = process.env.PORTABLE_EXECUTABLE_FILE
+  if (!portable) return
+  const legacy = path.join(app.getPath('appData'), '.minecraft')
+  try {
+    if (!fs.existsSync(legacy)) return
+    const hasRealContent = fs.readdirSync(legacy, { withFileTypes: true }).some((entry) => {
+      if (entry.isFile()) return true // 有任何文件都算有内容，保守保留
+      try { return fs.readdirSync(path.join(legacy, entry.name)).length > 0 } catch { return true }
+    })
+    if (hasRealContent) return
+    fs.rmSync(legacy, { recursive: true, force: true })
+  } catch { /* 清理失败不阻断启动 */ }
+}
+
 /** 配置不兼容时重置为默认（原文件先备份为 settings.backup-时间戳.json，可人工找回） */
 export function resetSettingsToDefaults(): void {
   const file = settingsFile()
