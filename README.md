@@ -1,17 +1,16 @@
 <div align="center">
 
-<img src="build/icon-512.png" width="128" alt="KAMUCL Logo">
+<img src="src/renderer/src/assets/splash-face.png" width="128" alt="baikun258 Logo">
 
-# KAMUCL
+# MC-Launcher
 
 ### ✦ 简约、开箱即用的 Minecraft Java 启动器 ✦
 
 <p>
-  <img src="https://img.shields.io/github/package-json/v/kamubaba-i/KAMUCL?filename=package.json&color=c77dff&style=flat-square" alt="version">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-8ecae6?style=flat-square" alt="platform">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-See%20LICENSE-ffb4a2?style=flat-square" alt="license: see LICENSE"></a>
   <img src="https://img.shields.io/badge/Electron-44.3.0-9be564?style=flat-square" alt="electron">
-  <a href="https://space.bilibili.com/9596327"><img src="https://img.shields.io/badge/Bilibili-作者主页-00AEEC?style=flat-square&logo=bilibili&logoColor=white" alt="Bilibili 作者主页"></a>
+  <img src="https://img.shields.io/badge/author-baikun258-00AEEC?style=flat-square" alt="author: baikun258">
 </p>
 
 <p>把账号、实例、模组和启动按钮，收进一个清爽的小窗口里。<br>
@@ -21,7 +20,7 @@
 
 ## 🌸 功能一览
 
-KAMUCL 基于 Electron 44.3.0、Vue 和 Three.js。当前交付 Windows x64 和 macOS ARM64；其他平台工程仍在仓库中，验收范围以对应 Release 为准。
+MC-Launcher 基于 Electron 44.3.0、Vue 和 Three.js，在 KAMUCL v1.1.21（MIT，原作者 kamubaba-i）基础上二次开发。当前交付 Windows x64 和 macOS ARM64；其他平台工程仍在仓库中，验收范围以对应 Release 为准。
 
 | 模块 | 说明 |
 | --- | --- |
@@ -56,14 +55,14 @@ KAMUCL 基于 Electron 44.3.0、Vue 和 Three.js。当前交付 Windows x64 和 
 
 ## 🚀 快速开始
 
-请从 [GitHub Releases](https://github.com/kamubaba-i/KAMUCL/releases) 下载对应平台的成品，并使用该版本的 `SHA256SUMS.txt` 核对文件。源码包不是可直接双击的应用。
+请从 [GitHub Releases](https://github.com/baikune258/MC-Launcher/releases) 下载对应平台的成品，并使用该版本的 `SHA256SUMS.txt` 核对文件。源码包不是可直接双击的应用。
 
 ### 直接运行（Windows）
 
 Windows 便携版是单个 EXE，文件名会跟随 `package.json` 的版本号：
 
 ```text
-release/KAMUCL-<version>.exe
+release/MC-Launcher-<version>.exe
 ```
 
 首次启动 Minecraft 前，请准备 Windows 10/11 64 位、与目标 Minecraft 版本匹配的 Java（现代版本通常使用 Java 17 或 21）和网络连接。Windows ZIP 包解压后需保留同目录下的全部文件。复制可执行文件不会自动复制用户配置目录中的账号、图片、收藏和游戏数据；分享整个文件夹前，请检查是否另行放入了用户数据。
@@ -83,8 +82,8 @@ release/KAMUCL-<version>.exe
 安装 Node.js 24、完整 JDK 17 或更新版本以及 Git；Windows 原生辅助程序需要 .NET SDK，macOS 原生辅助程序需要 Xcode Command Line Tools。确认 `node`、`npm`、`javac` 和 `jar` 都在 PATH 中。
 
 ```powershell
-git clone https://github.com/kamubaba-i/KAMUCL.git
-cd KAMUCL
+git clone https://github.com/baikune258/MC-Launcher.git
+cd MC-Launcher
 npm ci
 node scripts/build-bridge.cjs
 npm run dev
@@ -149,7 +148,7 @@ docs/           功能说明、构建说明与版本验证记录
 
 ## 💾 数据、日志与隐私
 
-启动器运行数据默认保存在 Windows 的 `%APPDATA%\KAMUCL`（macOS 为 `~/Library/Application Support/KAMUCL`），包括账号、设置、缓存和日志。反馈问题时，请先隐藏账号令牌、个人路径和公网 IP。
+启动器运行数据默认保存在 Windows 的 `%APPDATA%\KAMUCL`（macOS 为 `~/Library/Application Support/KAMUCL`），包括账号、设置、缓存和日志。**Windows 便携版（EXE/ZIP）会把运行文件与缓存解压到 EXE 同目录的 `KAMUCL-runtime`，不写入系统盘**，删除整个文件夹即可干净卸载。反馈问题时，请先隐藏账号令牌、个人路径和公网 IP。
 
 ## ❓ 常见问题
 
