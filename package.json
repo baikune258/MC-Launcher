@@ -74,12 +74,12 @@
         "portable",
         "zip"
       ],
-      "artifactName": "KAMUCL-${version}-windows-${arch}.${ext}",
+      "artifactName": "MC-Launcher-${version}-windows-${arch}.${ext}",
       "icon": "build/icon.png"
     },
     "portable": {
       "unpackDirName": false,
-      "artifactName": "KAMUCL-${version}.exe"
+      "artifactName": "MC-Launcher-${version}.exe"
     },
     "appImage": {
       "executableArgs": []
@@ -92,7 +92,7 @@
       "category": "public.app-category.games",
       "icon": "build/icon-512.png",
       "identity": null,
-      "artifactName": "KAMUCL-${version}-mac-${arch}.${ext}"
+      "artifactName": "MC-Launcher-${version}-mac-${arch}.${ext}"
     },
     "linux": {
       "maintainer": "kamubaba-i <325699197+kamubaba-i@users.noreply.github.com>",
@@ -102,9 +102,9 @@
         "tar.gz"
       ],
       "category": "Game",
-      "executableName": "kamucl",
+      "executableName": "mc-launcher",
       "icon": "build/icon-512.png",
-      "artifactName": "KAMUCL-${version}-linux-${arch}.${ext}",
+      "artifactName": "MC-Launcher-${version}-linux-${arch}.${ext}",
       "desktop": {
         "entry": {
           "Name": "KAMUCL",
@@ -114,7 +114,8 @@
         }
       },
       "synopsis": "Minecraft launcher"
-    }
+    },
+    "artifactName": ""
   },
   "dependencies": {
     "@iarna/toml": "2.2.5",
