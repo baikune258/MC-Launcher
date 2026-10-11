@@ -358,7 +358,7 @@ export function normalizeThemeName(value: unknown): ThemeName {
   ) {
     return raw
   }
-  return 'transparent'
+  return 'black-pink'
 }
 
 export interface VersionCategory { id: string; name: string }
@@ -408,6 +408,8 @@ export interface Settings {
   theme: ThemeName
   /** theme === 'custom' 时使用的自定义配色与布局 */
   custom: CustomTheme
+  /** 内置主题（白蓝/粉黑/粉白）各自的专属配色覆盖；每个主题可单独编辑个性化，互不冲突 */
+  themeCustoms?: Partial<Record<BuiltinThemeName, CustomTheme['colors']>>
   /** 禁用的功能模块 key（mods/packs/shaders/servers/skins/community），关闭后侧栏入口隐藏 */
   disabledFeatures: string[]
   /** 收藏的版本 id 列表（各列表置顶） */

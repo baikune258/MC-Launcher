@@ -46,7 +46,7 @@ export function useDesignSession() {
     toast('已回到当前正式外观，可继续编辑或撤销', 'info')
   }
   function defaults() {
-    previewAppearance({ theme: 'transparent', custom: structuredClone(DEFAULT_CUSTOM_THEME), homeLayout: structuredClone(DEFAULT_HOME_LAYOUT), background: structuredClone(DEFAULT_BACKGROUND), launchThumbnail: structuredClone(DEFAULT_LAUNCH_THUMBNAIL), visualDesign: { version: 1, pages: {} } })
+    previewAppearance({ theme: 'black-pink', custom: structuredClone(DEFAULT_CUSTOM_THEME), homeLayout: structuredClone(DEFAULT_HOME_LAYOUT), background: structuredClone(DEFAULT_BACKGROUND), launchThumbnail: structuredClone(DEFAULT_LAUNCH_THUMBNAIL), visualDesign: { version: 1, pages: {} } })
     themeOpen.value = false
     toast('默认外观已进入草稿，应用后生效；可撤销', 'info')
   }

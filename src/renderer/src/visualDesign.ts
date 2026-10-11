@@ -34,7 +34,17 @@ function persist(design:VisualDesign){if(!designDraft.value)return;designDraft.v
 export function previewAppearance(value:Partial<Settings>){checkpoint();designDraft.value=appearance({...appearancePreview.value!,...value});scheduleSave();refresh()}
 export async function finishDesign(action:'apply'|'keep'|'discard'){
  clearTimeout(saveTimer);await saveQueue.catch(()=>{})
- if(action==='apply'){await flushDesign();store.settings=await window.kamucl.invoke('appearance:draftApply',copy()) as Settings}
+ if(action==='apply'){await flushDesign();store.settings=await window.kamucl.invoke('appearance:draftApply',copy()) as Settings
+   // 内置主题（白蓝/粉黑/粉白）编辑个性化：保存为该主题专属覆盖，各主题互不冲突
+   const t=store.settings.theme
+   if(t!=='custom'&&designDraft.value?.custom){
+     const prev=store.settings.themeCustoms??{}
+     const merged={...prev,[t]:designDraft.value.custom.colors}
+     if(JSON.stringify(merged[t])!==JSON.stringify(prev[t])){
+       store.settings=await window.kamucl.invoke('settings:set',{themeCustoms:merged}) as Settings
+     }
+   }
+ }
  else if(action==='keep')await flushDesign()
  else await window.kamucl.invoke('appearance:draftDiscard')
  designDraft.value=null;designRecovered.value=false;refresh()

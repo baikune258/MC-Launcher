@@ -1,17 +1,20 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { enterEditMode, store, toast } from '../store'
-import { DEFAULT_CUSTOM_THEME, THEME_PRESETS, type Settings, type ThemeName } from '@shared/types'
+import { DEFAULT_CUSTOM_THEME, THEME_PRESETS, type BuiltinThemeName, type Settings, type ThemeName } from '@shared/types'
 import { updateSettings } from '../settingsUpdates'
 import { errText } from '../api'
 async function save(patch: Partial<Settings>) { try { await updateSettings(patch) } catch (error) { toast('保存设置失败：' + errText(error), 'error') } }
 const themeOptions = computed(() => {
   const customColors = store.settings?.custom.colors ?? DEFAULT_CUSTOM_THEME.colors
-  const named = (key: Exclude<ThemeName, 'custom'>) => ({ key, ...THEME_PRESETS[key] })
+  const named = (key: Exclude<ThemeName, 'custom'>) => ({
+    key,
+    label: THEME_PRESETS[key].label,
+    description: THEME_PRESETS[key].description,
+    colors: store.settings?.themeCustoms?.[key as BuiltinThemeName] ?? THEME_PRESETS[key].colors
+  })
   return [
-    named('transparent'),
     named('blue-white'),
-    named('black-orange'),
     named('black-pink'),
     named('white-pink'),
     {
@@ -46,7 +49,7 @@ function chooseTheme(theme: ThemeName) {
             >
               <span data-ui="SettingsView:ff8e35becbf3"
                 class="theme-preview"
-                :class="{ 'preview-custom': theme.key === 'custom', 'preview-transparent': theme.key === 'transparent' }"
+                :class="{ 'preview-custom': theme.key === 'custom' }"
                 :style="{ background: theme.colors.bg }"
               >
                 <span data-ui="SettingsView:202a66a2a038"

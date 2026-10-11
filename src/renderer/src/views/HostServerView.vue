@@ -201,8 +201,10 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
 .host-page .connection-header { margin:0; padding:0; }
 .host-page .connection-header h1 small { font-size:12px; font-weight:400; color:var(--text-dim); margin-left:12px; }
 .host-intro { margin:0; }
-.host-empty-card { text-align:center; padding:48px 24px; }
-.host-empty-card h3 { margin:16px 0 8px; }
+.host-empty-card { text-align:center; padding:40px 24px; }
+.host-empty-card .connection-symbol { width: 28px; height: 28px; }
+.host-empty-card .connection-symbol svg { width: 18px; height: 18px; }
+.host-empty-card h3 { margin:14px 0 8px; }
 .host-empty-card p { max-width:420px; margin:0 auto 18px; line-height:1.7; }
 .host-server-list { display:flex; flex-direction:column; gap:12px; }
 .host-server-card { border:1px solid var(--border); border-radius:var(--radius-md); padding:14px 16px; background:var(--surface-content); }

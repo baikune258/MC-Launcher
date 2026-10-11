@@ -8,6 +8,9 @@ export interface UpdateNote {
 
 /** 按版本倒序；latest 为当前版本 */
 export const updateNotes: UpdateNote[] = [
+  {"version":"1.1.39","date":"2026-10-11 09:34","changes":["修复了一些BUG或问题"]},
+  {"version":"1.1.38","date":"2026-10-11 09:00","changes":["修复了一些BUG或问题"]},
+  {"version":"1.1.37","date":"2026-10-11 08:50","changes":["修复了一些BUG或问题"]},
   {"version":"1.1.36","date":"2026-10-11 08:30","changes":["新增：在线服务器功能——自建原版常驻服务器，后台一直运行（关闭启动器也不停），好友用地址即可加入；支持启动器打开时自动拉起、日志查看、局域网地址复制"]},
   {"version":"1.1.33","date":"2026-10-11 07:30","changes":["修复了一些BUG或问题"]},
   {"version":"1.1.32","date":"2026-10-10 21:00","changes":["修复了一些BUG或问题"]},

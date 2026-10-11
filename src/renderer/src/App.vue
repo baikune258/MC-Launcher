@@ -56,7 +56,7 @@ import type {
   WorldImportInfo,
   YggdrasilProviderInput
 } from '@shared/types'
-import { DEFAULT_CUSTOM_THEME, THEME_PRESETS } from '@shared/types'
+import { DEFAULT_CUSTOM_THEME, THEME_PRESETS, type BuiltinThemeName } from '@shared/types'
 import { readableCustomColors } from '@shared/themeContrast'
 import { managedImageUrl } from './managedAssets'
 import Toasts from './components/Toasts.vue'
@@ -205,12 +205,6 @@ const resourceSubItems: Array<{ key: ViewName; label: string; icon: string }> = 
     label: 'MOD 面板',
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="3.5"/></svg>'
   },
-  {
-    key: 'servers',
-    label: '服务器',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg>'
-  },
-
 ]
 
 /** 资源管理组是否展开（默认折叠；当前在其中任一子页时强制展开高亮） */
@@ -1036,16 +1030,17 @@ function applyCustomVars(custom: CustomTheme, theme: ThemeName) {
  */
 function applyTheme(theme?: ThemeName, custom?: CustomTheme) {
   const root = document.documentElement
-  const selected = theme ?? 'transparent'
+  const selected = theme ?? 'black-pink'
   clearCustomVars()
   root.dataset.theme = selected
   if (selected === 'custom') {
     applyCustomVars(custom ?? DEFAULT_CUSTOM_THEME, selected)
     return
   }
-  const preset = THEME_PRESETS[selected] ?? THEME_PRESETS.transparent
+  const preset = THEME_PRESETS[selected] ?? THEME_PRESETS['black-pink']
+  const override = store.settings?.themeCustoms?.[selected as BuiltinThemeName]
   applyCustomVars(
-    { colors: preset.colors, layout: DEFAULT_CUSTOM_THEME.layout },
+    { colors: override ?? preset.colors, layout: DEFAULT_CUSTOM_THEME.layout },
     selected
   )
   // 通知主进程：Windows acrylic 背景偶发不随内容切换刷新，需主动触发一次合成重绘
@@ -1055,7 +1050,7 @@ function applyTheme(theme?: ThemeName, custom?: CustomTheme) {
 // settings 未加载时按亮色应用；加载完成 / 修改后 watch 触发立即生效
 // deep: true 保证 custom.colors / custom.layout 内部字段变化也重新应用（即改即生效）
 watch(
-  () => [appearancePreview.value?.theme, appearancePreview.value?.custom] as const,
+  () => [appearancePreview.value?.theme, appearancePreview.value?.custom, appearancePreview.value?.themeCustoms] as const,
   ([t, c]) => applyTheme(t, c),
   { immediate: true, deep: true }
 )

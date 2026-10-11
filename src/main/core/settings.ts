@@ -59,7 +59,7 @@ function defaults(): Settings {
     uiWindowAutoFit: false,
     updateMirrorUrls: [],
     msClientId: DEFAULT_MS_CLIENT_ID,
-    theme: 'transparent',
+    theme: 'black-pink',
     custom: structuredClone(DEFAULT_CUSTOM_THEME),
     disabledFeatures: [],
     favoriteVersions: [],
