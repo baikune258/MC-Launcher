@@ -483,7 +483,7 @@ export async function installModpackToHostServer(id: string, filePath: string, o
   const serverRoot = serverDir(id)
   const modsDir = path.join(serverRoot, 'mods')
   fs.mkdirSync(modsDir, { recursive: true })
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mc-launcher-hostpack-'))
+  const tmp = fs.mkdtempSync(path.join(serverRoot, '.hostpack-tmp-'))
   try {
     const zip = new AdmZip(src)
     const names = new Set(zip.getEntries().map((e) => normPackEntry(e.entryName)))
@@ -500,7 +500,9 @@ export async function installModpackToHostServer(id: string, filePath: string, o
         if (!p.startsWith('mods/') || !/\.jar$/i.test(p)) continue
         const url = (f.downloads ?? []).find((u) => typeof u === 'string' && /^https?:/.test(u))
         if (!url) continue
-        tasks.push({ url, urls: [url], dest: path.join(modsDir, path.basename(p)), size: f.size })
+        const sha1 = f.hashes?.sha1?.toLowerCase()
+        const sha512 = f.hashes?.sha512?.toLowerCase()
+        tasks.push({ url, urls: [url], dest: path.join(modsDir, path.basename(p)), size: f.size, sha1, sha512 })
       }
       for (let i = 0; i < tasks.length; i += 8) {
         const batch = tasks.slice(i, i + 8)

@@ -175,8 +175,16 @@ export function registerIpc(getWin: () => BrowserWindow | null): void {
     const rec = listHostServers().find((s) => s.id === id)
     if (!rec) throw new Error('服务器不存在')
     if (rec.type !== 'modded') throw new Error('只有模组服务器（Fabric）支持安装整合包')
-    const { installCommunityModpackToServer } = await import('./core/community')
-    return installCommunityModpackToServer(file, id)
+    try {
+      const { installCommunityModpackToServer } = await import('./core/community')
+      return await installCommunityModpackToServer(file, id)
+    } catch (err) {
+      const msg = String((err as Error)?.message ?? err)
+      if (/(超时|timeout|ECONN|ENOTFOUND|getaddrinfo|fetch failed|Failed to fetch|连接失败|网络)/i.test(msg)) {
+        throw new Error('整合包下载失败：Modrinth 官方 CDN 连接超时或不可达。可稍后重试，或开启网络加速后重试。')
+      }
+      throw err
+    }
   })
   const send = (channel: string, payload: unknown): void => {
     const window = getWin()

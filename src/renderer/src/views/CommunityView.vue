@@ -494,7 +494,8 @@ function confirmDownload() {
         modal.open = false; fileGeneration++; openGeneration++
         toast(`整合包已装入服务器：${mods} 个模组${overrides ? ` / ${overrides} 个覆盖文件` : ''}，重启服务器后生效`, 'success')
       } catch (e) {
-        toast('安装到服务器失败：' + errText(e), 'error')
+        const msg = errText(e)
+        toast(msg.includes('CDN') || msg.includes('超时') || msg.includes('网络') ? msg + '（可稍后重试或开启网络加速）' : '安装到服务器失败：' + msg, 'error')
       }
     })()
     return

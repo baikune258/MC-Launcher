@@ -794,18 +794,29 @@ export async function installCommunityModpackToServer(
   signal?: AbortSignal
 ): Promise<{ mods: number; overrides: number }> {
   const fileName = downloadFileName(String(file.fileName ?? ''))
-  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kamucl-pack-'))
+  const tmpBase = path.join(defaultFolderPath(), '.kamucl', 'hostpack-tmp')
+  fs.mkdirSync(tmpBase, { recursive: true })
+  const tmpRoot = fs.mkdtempSync(path.join(tmpBase, 'pack-'))
   const tmpPath = path.join(tmpRoot, fileName)
   const cleanup = (): void => {
     try { fs.rmSync(tmpRoot, { recursive: true, force: true }) }
     catch (err) { communityLog.warn(`整合包临时文件清理失败：${tmpRoot}`, err) }
   }
   try {
+    const packUrl = String(file.url ?? '')
+    const packCandidates: string[] = [packUrl]
+    try {
+      const u = new URL(packUrl)
+      if (u.protocol === 'https:' && u.hostname === 'cdn.modrinth.com') {
+        u.hostname = 'mod.mcimirror.top'
+        packCandidates.push(u.href)
+      }
+    } catch { /* 非法 URL 交由下载层报错 */ }
     await downloadAll(
-      [{ url: file.url, dest: tmpPath, sha1: file.sha1, size: file.size || undefined }],
+      [{ url: packUrl, urls: packCandidates.slice(1), dest: tmpPath, sha1: file.sha1, size: file.size || undefined }],
       (d, t) => emit?.({ stage: 'download', progress: t ? d / t : 0, text: '下载整合包…' }),
       1,
-      getSettings().mirror,
+      'bmclapi',
       signal
     )
     signal?.throwIfAborted()
