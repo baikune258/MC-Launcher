@@ -453,7 +453,7 @@ async function tcStart(payload: { mode: 'host' | 'join'; code?: string; port?: n
     setState({ phase: 'starting' })
     await startProcess()
     if (generation !== operation) return { ...state }
-    const me = payload.playerName || 'KAMUCL'
+    const me = payload.playerName || 'MC-Launcher'
     if (payload.mode === 'host') {
       setState({ phase: 'hosting', room: undefined, url: undefined, error: undefined })
       await tcGet(`/state/scanning?player=${encodeURIComponent(me)}`)

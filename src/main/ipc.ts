@@ -877,7 +877,7 @@ export function registerIpc(getWin: () => BrowserWindow | null): void {
     const opts = {
       properties: ['openFile' as const],
       title: '选择插件（.js 文件）',
-      filters: [{ name: 'KAMUCL 插件', extensions: ['js'] }]
+      filters: [{ name: 'MC-Launcher 插件', extensions: ['js'] }]
     }
     const r = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
     if (r.canceled || !r.filePaths[0]) return plugins.listPlugins()
@@ -940,8 +940,8 @@ export function registerIpc(getWin: () => BrowserWindow | null): void {
     const win = getWin()
     const opts = {
       properties: ['openFile' as const],
-      title: '选择 KAMUCL 安装包',
-      filters: [{ name: 'KAMUCL 安装包', extensions: process.platform === 'linux' ? ['AppImage', 'deb', 'gz'] : [process.platform === 'darwin' ? 'zip' : 'exe'] }]
+      title: '选择 MC-Launcher 安装包',
+      filters: [{ name: 'MC-Launcher 安装包', extensions: process.platform === 'linux' ? ['AppImage', 'deb', 'gz'] : [process.platform === 'darwin' ? 'zip' : 'exe'] }]
     }
     const result = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
     if (result.canceled || !result.filePaths[0]) return null

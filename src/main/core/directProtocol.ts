@@ -39,7 +39,7 @@ export function parseInvitation(input: string, now = Date.now()): DirectInvitati
   try {
     const raw = input.trim()
     value = JSON.parse(raw.startsWith('KAMUCL-DIRECT-1:') ? Buffer.from(raw.slice(16), 'base64url').toString('utf8') : raw)
-  } catch { throw new Error('无法识别邀请，请粘贴完整的 KAMUCL-DIRECT-1 邀请信息') }
+  } catch { throw new Error('无法识别邀请，请粘贴完整的联机邀请信息') }
   if (!value || value.format !== 'KAMUCL-DIRECT' || value.version !== 1 ||
       typeof value.name !== 'string' || !value.name.trim() || value.name.length > 128 ||
       typeof value.minecraftVersion !== 'string' || value.minecraftVersion.length > 128 ||
