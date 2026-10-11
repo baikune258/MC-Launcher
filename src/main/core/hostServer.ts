@@ -185,19 +185,25 @@ export async function createHostServer(input: HostServerCreateInput, onProgress?
     if (!Array.isArray(loaderList) || !loaderList.length) {
       throw new Error(`Minecraft ${entry.id} 暂不支持 Fabric 模组服务器`)
     }
-    // 列表首项不一定可用（个别 Loader 与该版本组合 404），依次探测前几个 Loader 的 server/jar
+    // Fabric server/jar 标准 URL 为 4 段：loader/{mc}/{loader}/{installer}/server/jar，缺 installer 段必然 404。
+    // 先取最新 installer 版本，再依次探测前 8 个 Loader 组合（个别 Loader 与该版本组合可能 404/超时）。
+    const installerRes = await downloadFetch('https://meta.fabricmc.net/v2/versions/installer', { signal: AbortSignal.timeout(15000) })
+    if (!installerRes.ok) throw new Error('获取 Fabric 安装器版本失败，请检查网络后重试')
+    const installerList = (await installerRes.json()) as Array<{ version?: string; stable?: boolean }>
+    const installer = (Array.isArray(installerList) ? installerList.find((i) => i.stable === true) ?? installerList[0] : undefined)?.version
+    if (!installer) throw new Error('获取 Fabric 安装器版本失败，请检查网络后重试')
     let serverUrl: string | null = null
-    for (const item of loaderList.slice(0, 5)) {
+    for (const item of loaderList.slice(0, 8)) {
       const lv = item?.loader?.version
       if (!lv) continue
-      const candidate = `https://meta.fabricmc.net/v2/versions/loader/${encodeURIComponent(entry.id)}/${encodeURIComponent(lv)}/server/jar`
+      const candidate = `https://meta.fabricmc.net/v2/versions/loader/${encodeURIComponent(entry.id)}/${encodeURIComponent(lv)}/${encodeURIComponent(installer)}/server/jar`
       try {
-        const probe = await downloadFetch(candidate, { method: 'HEAD', signal: AbortSignal.timeout(10000) })
+        const probe = await downloadFetch(candidate, { method: 'HEAD', signal: AbortSignal.timeout(15000) })
         if (probe.ok) { serverUrl = candidate; break }
         await probe.body?.cancel()
       } catch { /* 单次探测失败继续尝试下一个 */ }
     }
-    if (!serverUrl) throw new Error(`Minecraft ${entry.id} 暂不支持 Fabric 模组服务器（未找到可用 Loader）`)
+    if (!serverUrl) throw new Error(`Minecraft ${entry.id} 暂不支持 Fabric 模组服务器（未找到可用 Loader，Fabric 官方可能暂未提供该版本的服务器端）`)
     onProgress?.('下载 Fabric 服务端', 5)
     await downloadAll([
       {
