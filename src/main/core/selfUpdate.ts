@@ -196,8 +196,13 @@ async function fetchRawUpdate(signal?: AbortSignal): Promise<ReleaseInfo | null>
     const version = String(j.latest ?? '').replace(/^v/i, '')
     if (!/^\d+\.\d+\.\d+$/.test(version)) return null
     const name = updateAssetName(version)
-    if (j.assetName !== name) return null
-    const expectedUrl = `https://github.com/${GITHUB_REPO}/releases/download/v${version}/${name}`
+    // v1.1.42 起 Windows 安装包固定命名为 MC-Launcher.exe（版本号只在启动器内显示）。
+    // 仓库根 update.json 仍需指向带版本号的兼容资产名，让 ≤1.1.41 旧版本（其二进制
+    // 仍按 MC-Launcher-<版本>.exe 查找）在 API 通道失败时也能走通备用通道。
+    const legacyName = process.platform === 'win32' ? `MC-Launcher-${version}.exe` : null
+    const assetName = j.assetName === name || j.assetName === legacyName ? j.assetName : null
+    if (!assetName) return null
+    const expectedUrl = `https://github.com/${GITHUB_REPO}/releases/download/v${version}/${assetName}`
     if (j.assetUrl !== expectedUrl) return null
     if (typeof j.sha256SumsUrl !== 'string' || !/^https:\/\/github\.com\/[^/]+\/[^/]+\/releases\/download\/v[\d.]+\/SHA256SUMS\.txt$/.test(j.sha256SumsUrl)) return null
     const release: ReleaseInfo = {
@@ -206,7 +211,7 @@ async function fetchRawUpdate(signal?: AbortSignal): Promise<ReleaseInfo | null>
       body: String(j.body ?? ''),
       assetUrl: expectedUrl,
       assetSize: 0,
-      assetName: name
+      assetName
     }
     return release
   } catch (e) {

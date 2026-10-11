@@ -8,7 +8,8 @@ const Zip = require('adm-zip')
 
 async function packWindowsZip(root = path.resolve(__dirname, '..')) {
   const { version } = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
-  const name = `MC-Launcher-${version}.exe`
+  // v1.1.42 起 Windows 便携版固定命名为 MC-Launcher.exe（版本号只在启动器内显示）
+  const name = `MC-Launcher.exe`
   const exe = fs.readFileSync(path.join(root, 'release', name))
   assert.equal(exe.subarray(0, 2).toString(), 'MZ', 'Portable EXE is missing or invalid')
   const zip = new Zip()

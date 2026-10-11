@@ -19,7 +19,7 @@ async function runtime(t: any, env: Record<string, string> = {}, platform = proc
   const fakeProcess = { ...process, platform, arch, env: fixtureEnv }
   new Function('require','module','exports','process',await code)(
     (name: string) => name === 'electron' ? { app: { isPackaged: true, getPath: () => root, getVersion: () => '1.0.41', getName: () => 'test' } }
-      : name === 'undici' ? { ...require(name), fetch: async (url: string) => { requested.push(String(url)); return Response.json({ tag_name: 'v1.0.30', assets: [{ name: 'MC-Launcher-1.0.30.exe', size: 123, browser_download_url: 'https://github.com/baikune258/MC-Launcher/releases/download/v1.0.30/MC-Launcher-1.0.30.exe' }] }) } }
+      : name === 'undici' ? { ...require(name), fetch: async (url: string) => { requested.push(String(url)); return Response.json({ tag_name: 'v1.0.30', assets: [{ name: 'MC-Launcher.exe', size: 123, browser_download_url: 'https://github.com/baikune258/MC-Launcher/releases/download/v1.0.30/MC-Launcher.exe' }] }) } }
       : require(name), mod, mod.exports, fakeProcess)
   return { root, api: mod.exports, requested, fixtureEnv }
 }
@@ -165,7 +165,7 @@ test('Windows packaged updates ignore test overrides and reject local v99 pendin
   fs.writeFileSync(path.join(root, 'update-check-cache.json'), JSON.stringify({ checkedAt: Date.now(), latest: release }))
   const checked = await api.checkLatest(false)
   assert.equal(checked.hasUpdate, false); assert.equal(checked.release.version, '1.0.30'); assert(requested.every(u => u.startsWith('https://api.github.com/')))
-  const official = { ...release, version: '1.0.42', assetName: 'MC-Launcher-1.0.42.exe', assetUrl: 'https://github.com/baikune258/MC-Launcher/releases/download/v1.0.42/MC-Launcher-1.0.42.exe' }
+  const official = { ...release, version: '1.0.42', assetName: 'MC-Launcher.exe', assetUrl: 'https://github.com/baikune258/MC-Launcher/releases/download/v1.0.42/MC-Launcher.exe' }
   const officialFile = path.join(root, official.assetName); fs.writeFileSync(officialFile, 'fixture')
   fs.writeFileSync(path.join(root, 'pending-update.json'), JSON.stringify({ release: official, file: officialFile }))
   assert.equal(api.getPendingUpdate().release.version, '1.0.42')

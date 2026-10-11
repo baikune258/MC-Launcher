@@ -1,8 +1,8 @@
 {
-  "latest": "1.1.41",
-  "assetName": "MC-Launcher-1.1.41.exe",
-  "assetUrl": "https://github.com/baikune258/MC-Launcher/releases/download/v1.1.41/MC-Launcher-1.1.41.exe",
-  "publishedAt": "2026-10-11T11:00:00Z",
-  "body": "新增：从其他启动器导入的版本缺少依赖库时自动多源补齐（兼容老版本/第三方整合包）",
-  "sha256SumsUrl": "https://github.com/baikune258/MC-Launcher/releases/download/v1.1.41/SHA256SUMS.txt"
+  "latest": "1.1.42",
+  "assetName": "MC-Launcher-1.1.42.exe",
+  "assetUrl": "https://github.com/baikune258/MC-Launcher/releases/download/v1.1.42/MC-Launcher-1.1.42.exe",
+  "publishedAt": "2026-10-11T12:00:00Z",
+  "body": "修复了一些BUG或问题",
+  "sha256SumsUrl": "https://github.com/baikune258/MC-Launcher/releases/download/v1.1.42/SHA256SUMS.txt"
 }

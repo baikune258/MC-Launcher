@@ -8,7 +8,7 @@ const assert = require('node:assert/strict')
 const version = require('../package.json').version
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kamucl portable 空格-'))
 const executable = path.join(root, `MC-Launcher test ${version}.exe`)
-fs.copyFileSync(path.resolve(`release/MC-Launcher-${version}.exe`), executable)
+fs.copyFileSync(path.resolve(`release/MC-Launcher.exe`), executable)
 const marker = path.join(root, 'launch proof.json')
 const env = { ...process.env, TEMP: root, TMP: root, ELECTRON_RUN_AS_NODE: '1', MC_LAUNCHER_QA_MARKER: marker }
 const result = spawnSync(executable, ['-e', 'require("fs").writeFileSync(process.env.MC_LAUNCHER_QA_MARKER,JSON.stringify({exe:process.execPath,argv:process.argv}))'], { env, windowsHide: true, timeout: 90000, encoding: 'utf8' })

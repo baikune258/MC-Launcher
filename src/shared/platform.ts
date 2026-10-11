@@ -31,7 +31,7 @@ export function platformInfo(platform: string, arch: string, installation: Insta
 export function updateArtifactName(version: string, platform: string, arch: string, installation: InstallationKind): string {
   if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error('无效的更新版本')
   if (arch !== 'x64' && arch !== 'arm64') throw new Error('当前处理器架构没有经过验证的更新包')
-  if (platform === 'win32') return `MC-Launcher-${version}.exe`
+  if (platform === 'win32') return `MC-Launcher.exe`
   if (platform === 'darwin') return `MC-Launcher-${version}-mac-${arch}.zip`
   if (platform === 'linux') {
     const extension = installation === 'appimage' ? 'AppImage' : installation === 'deb' ? 'deb' : 'tar.gz'
