@@ -1,9 +1,10 @@
 {
-  "name": "kamucl",
+  "name": "mc-launcher",
   "productName": "MC-Launcher",
-  "version": "1.1.45",
-  "description": "KAMUCL - 简约美观的一键式 Minecraft 启动器",
-  "homepage": "https://github.com/kamubaba-i/KAMUCL",
+  "version": "1.1.46",
+  "description": "MC-Launcher - 属于你的我的世界启动器",
+  "author": "baikun <baikune258@users.noreply.github.com>",
+  "homepage": "https://github.com/baikune258/MC-Launcher",
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
@@ -55,6 +56,12 @@
     "beforePack": "scripts/portable-build-hook.cjs",
     "afterPack": "scripts/verify-windows-runtime.cjs",
     "win": {
+      "versionInfo": {
+        "FileDescription": "MC-Launcher - 属于你的我的世界启动器",
+        "ProductName": "MC-Launcher",
+        "CompanyName": "baikun",
+        "LegalCopyright": "Copyright (C) 2026 baikun"
+      },
       "files": [
         "out/main/**",
         "out/preload/**",
@@ -96,7 +103,7 @@
       "artifactName": "MC-Launcher-${version}-mac-${arch}.${ext}"
     },
     "linux": {
-      "maintainer": "kamubaba-i <325699197+kamubaba-i@users.noreply.github.com>",
+      "maintainer": "baikun <baikune258@users.noreply.github.com>",
       "target": [
         "AppImage",
         "deb",
