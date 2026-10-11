@@ -224,6 +224,8 @@ interface LibEntry {
   /** 本地绝对路径 */
   path: string
   url?: string
+  /** 无明确下载地址（仅 maven 坐标）时的多仓库兜底候选源，首个 404 自动切换 */
+  urls?: string[]
   sha1?: string
   size?: number
   isNative: boolean
@@ -235,7 +237,7 @@ function collectLibraries(vj: VersionJson): LibEntry[] {
   const out: LibEntry[] = []
   const seen = new Set<string>()
   const coordinates = new Set<string>()
-  const push = (art: (Pick<LibraryArtifact, 'path'> & Partial<LibraryArtifact>) | undefined, isNative: boolean, coordinate?: string, nativeChecksumUrl?: string): void => {
+  const push = (art: (Pick<LibraryArtifact, 'path'> & Partial<LibraryArtifact>) | undefined, isNative: boolean, coordinate?: string, nativeChecksumUrl?: string, urls?: string[]): void => {
     if (!art?.path) return
     const dest = libraryPath(art.path)
     // Retain installer-generated entries even when missing, so launch validation
@@ -244,7 +246,7 @@ function collectLibraries(vj: VersionJson): LibEntry[] {
     if (coordinate) coordinates.add(coordinate)
     if (seen.has(dest)) return
     seen.add(dest)
-    out.push({ path: dest, url: art.url, sha1: art.sha1, size: art.size, isNative, nativeChecksumUrl })
+    out.push({ path: dest, url: art.url, urls, sha1: art.sha1, size: art.size, isNative, nativeChecksumUrl })
   }
   /** maven 坐标（group:artifact:version[:classifier]）→ 仓库相对路径 */
   const mavenPath = (name: string): string | null => {
@@ -261,6 +263,19 @@ function collectLibraries(vj: VersionJson): LibEntry[] {
     if (name.startsWith('net.neoforged:')) return 'https://maven.neoforged.net/releases/'
     return null
   }
+  /**
+   * 无明确下载地址的库（老版本/第三方整合包 json 仅给 maven 坐标）：
+   * 按多仓库兜底候选源逐个尝试（404 自动切换），避免「缺少下载地址」导致拷入版本无法启动。
+   * 顺序兼顾 mojang 老库、国内聚合仓库与各加载器仓库。
+   */
+  const fallbackRepos = (rel: string): string[] => [
+    `https://libraries.minecraft.net/${rel}`,
+    `https://maven.aliyun.com/repository/public/${rel}`,
+    `https://repo1.maven.org/maven2/${rel}`,
+    `https://maven.fabricmc.net/${rel}`,
+    `https://maven.minecraftforge.net/${rel}`,
+    `https://maven.neoforged.net/releases/${rel}`
+  ]
   for (const source of vj.libraries ?? []) {
     if (!rulesAllow(source.rules)) continue
     const lib = nativeLibraryForHost(source)
@@ -277,11 +292,12 @@ function collectLibraries(vj: VersionJson): LibEntry[] {
       // Mojang 的 classifiers-only 库明确没有普通 artifact；不能推断一个
       // 不存在的 base JAR，否则安装成功后仍会在启动校验时缺少下载地址。
       // forge 安装器注入库（fmlcore/javafmllanguage/mclanguage/lowcodelanguage 等）：
-      // json 仅给 maven 坐标，本地有则直接收编，缺失按组织推断 maven 源下载
+      // json 仅给 maven 坐标，本地有则直接收编，缺失按组织推断 maven 源下载；
+      // 未知组织一律落到多仓库兜底候选，保证从其他启动器拷入的版本也能补齐缺失库。
       const rel = mavenPath(lib.name)
       if (rel) {
         const base = mavenRepoBase(lib.name)
-        push({ path: rel, url: base ? base + rel : undefined }, false, mavenIdentity(lib.name))
+        push({ path: rel, url: base ? base + rel : undefined }, false, mavenIdentity(lib.name), undefined, base ? undefined : fallbackRepos(rel))
       }
     }
     const nativesKey = lib.natives?.[OS_NAME]?.replace(
@@ -297,10 +313,10 @@ function collectLibraries(vj: VersionJson): LibEntry[] {
 export function libraryTasks(vj: VersionJson): DownloadTask[] {
   const folders = allFolders()
   return collectLibraries(vj)
-    .filter((e) => e.url)
+    .filter((e) => e.url || (e.urls && e.urls.length))
     .map((e) => {
       const relative = path.relative(librariesDir(), e.path)
-      return { url: e.url as string, dest: e.path, sha1: e.sha1, size: e.size, nativeChecksumUrl: e.nativeChecksumUrl,
+      return { url: e.url ?? e.urls![0], urls: e.urls, dest: e.path, sha1: e.sha1, size: e.size, nativeChecksumUrl: e.nativeChecksumUrl,
         reuseFiles: !relative.startsWith('..') && !path.isAbsolute(relative)
           ? folders.map(folder => path.join(folder, 'libraries', relative)) : [] }
     })
@@ -537,7 +553,7 @@ export async function installVersion(
 }
 
 export function launchLibraryFiles(vj: VersionJson) {
-  return collectLibraries(vj).map(e => ({ dest: e.path, url: e.url, sha1: e.sha1, size: e.size, nativeChecksumUrl: e.nativeChecksumUrl }))
+  return collectLibraries(vj).map(e => ({ dest: e.path, url: e.url, urls: e.urls, sha1: e.sha1, size: e.size, nativeChecksumUrl: e.nativeChecksumUrl }))
 }
 
 async function installVersionInFolder(

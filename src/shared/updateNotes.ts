@@ -8,6 +8,7 @@ export interface UpdateNote {
 
 /** 按版本倒序；latest 为当前版本 */
 export const updateNotes: UpdateNote[] = [
+  {"version":"1.1.41","date":"2026-10-11 19:00","changes":["新增：从其他启动器导入的版本缺少依赖库时自动多源补齐（兼容老版本/第三方整合包）"]},
   {"version":"1.1.40","date":"2026-10-11 18:00","changes":["修复了一些BUG或问题"]},
   {"version":"1.1.39","date":"2026-10-11 09:34","changes":["修复了一些BUG或问题"]},
   {"version":"1.1.38","date":"2026-10-11 09:00","changes":["修复了一些BUG或问题"]},

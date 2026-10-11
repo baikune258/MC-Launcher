@@ -76,7 +76,8 @@ test('classifier metadata preserves explicit base artifacts and does not hide na
     assert.match(launch[1].url!, /maven\.minecraftforge\.net\/net\/minecraftforge\/fmlcore\/1\.0\/fmlcore-1\.0\.jar$/)
     assert.equal(launch[2].url, 'https://example.invalid/maven/fixture/required/1/required-1.jar')
     assert.equal(launch[3].url, undefined)
-    await assert.rejects(ensureLaunchArtifact(launch[3], 'official'), /缺少下载地址/)
+    assert(launch[3].urls && launch[3].urls.length >= 5, '无地址库应带多仓库兜底候选源')
+    await assert.rejects(ensureLaunchArtifact(launch[3], 'official'), /下载失败/)
   } finally { await runtime.closeHttpClient(); fs.rmSync(root, { recursive: true, force: true }) }
 })
 

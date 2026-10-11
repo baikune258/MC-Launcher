@@ -3,7 +3,7 @@ import path from 'node:path'
 import AdmZip from 'adm-zip'
 import { verifyFile, downloadFile, type MirrorPref } from './download'
 
-export interface LaunchArtifact { dest: string; url?: string; sha1?: string; size?: number }
+export interface LaunchArtifact { dest: string; url?: string; urls?: string[]; sha1?: string; size?: number }
 // Only successful checks are reused, within this launcher process. Any changed
 // inode, size, mtime, ctime or expected digest forces a full check again.
 const verifiedArtifacts = new Map<string, { signature: string; expires: number }>()
@@ -36,7 +36,9 @@ export async function invalidLaunchArtifact(file: LaunchArtifact): Promise<strin
 export async function ensureLaunchArtifact(file: LaunchArtifact, mirror: MirrorPref, progress?: (done: number, total: number) => void, signal?: AbortSignal): Promise<boolean> {
   const reason = await invalidLaunchArtifact(file)
   if (!reason) return false
-  if (!file.url) throw new Error(`${file.dest}：${reason}，缺少下载地址，请修复或重新安装加载器`)
+  if (!file.url && !(file.urls && file.urls.length)) throw new Error(`${file.dest}：${reason}，缺少下载地址，请修复或重新安装加载器`)
+  const primary = file.url ?? file.urls![0]
+  const alternatives = file.urls ? (file.url ? [...file.urls] : file.urls.slice(1)) : []
   await fs.promises.mkdir(path.dirname(file.dest), {recursive:true})
   const stat=()=>fs.promises.lstat(file.dest).catch(e=>{if(e.code==='ENOENT')return null;throw e})
   const before=await stat()
@@ -45,7 +47,7 @@ export async function ensureLaunchArtifact(file: LaunchArtifact, mirror: MirrorP
   const temporary=path.join(stage,path.basename(file.dest)),old=path.join(stage,'original')
   let preserve=false
   try{
-    await downloadFile(file.url, temporary, progress, file.sha1, mirror, signal, [], { size: file.size })
+    await downloadFile(primary, temporary, progress, file.sha1, mirror, signal, alternatives, { size: file.size })
     const after=await invalidLaunchArtifact({...file,dest:temporary})
     if(after)throw new Error(`${file.dest}：修复后仍未通过完整性校验（${after}）`)
     signal?.throwIfAborted()
