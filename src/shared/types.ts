@@ -990,7 +990,8 @@ export const IPC_EVENT = {
   gameDirDone: 'event:gameDirDone', // (r: { ok: boolean; error?: string; gameDir?: string })  目录迁移结束（配置已切换/失败已回滚）
   updatePrompt: 'event:updatePrompt', // (r: ReleaseInfo)  启动自动检查发现新版本 → 弹窗
   updateSlowHint: 'event:updateSlowHint', // (r: { taskId: string })  更新下载连续 30s 低于 100KB/s → 进度界面内嵌提示一次
-  updateReady: 'event:updateReady' // (r: { version: string })  更新已下载校验就绪，关闭启动器时自动安装
+  updateReady: 'event:updateReady', // (r: { version: string })  更新已下载校验就绪，关闭启动器时自动安装
+  hostServerProgress: 'host-server:progress' // (r: { label: string; percent: number })  创建在线服务器进度
 } as const
 
 /**

@@ -150,7 +150,7 @@ export function registerIpc(getWin: () => BrowserWindow | null): void {
   registerTerracottaIpc(ipcMain)
   registerFrpIpc(ipcMain)
   installFrpEventBridge(getWin)
-  registerHostServerIpc(ipcMain)
+  registerHostServerIpc(ipcMain, getWin)
   // 在线服务器：上传数据包 / 上传模组（弹窗选文件后装入对应目录）
   ipcMain.handle(IPC.hostServerUploadDatapack, async (_e, id: string) => {
     const opts = { title: '选择数据包（.zip）', filters: [{ name: 'Minecraft 数据包', extensions: ['zip'] }], properties: ['openFile' as const] }

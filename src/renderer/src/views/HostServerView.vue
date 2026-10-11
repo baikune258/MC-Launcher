@@ -12,6 +12,7 @@ import {
   deleteHostServer,
   uploadHostServerDatapack,
   uploadHostServerMod,
+  onHostServerProgress,
   getManifest
 } from '../api'
 import { toast } from '../store'
@@ -20,7 +21,17 @@ import type { HostServerRecord, HostServerStatus, HostServerCreateInput, HostSer
 const hostServers = ref<HostServerRecord[]>([])
 const hostStatus = reactive<Record<string, HostServerStatus>>({})
 const hostBusy = ref('')
-const hostCreate = reactive({ open: false, busy: false, error: '', name: '', mcVersion: '', type: 'datapack' as HostServerType, port: 25565, ramMb: 2048, autoResume: true, onlineMode: false })
+const hostCreate = reactive({ open: false, busy: false, error: '', name: '', mcVersion: '', type: 'datapack' as HostServerType, port: 25565, ramMb: 2048, autoResume: true, onlineMode: false, progressLabel: '', progressPercent: 0 })
+let offHostProgress: (() => void) | null = null
+function onHostCreateProgress(r: { label: string; percent: number }) {
+  hostCreate.progressLabel = r.label
+  hostCreate.progressPercent = Math.max(0, Math.min(100, r.percent))
+}
+const hostCreateBusyText = computed(() => {
+  if (!hostCreate.busy) return '创建并启动'
+  if (hostCreate.progressLabel) return `${hostCreate.progressLabel} ${hostCreate.progressPercent}%`
+  return '创建中…'
+})
 const hostVersions = ref<RemoteVersion[]>([])
 const hostLogOpen = ref<Record<string, boolean>>({})
 const hostLoaded = ref(false)
@@ -50,6 +61,9 @@ async function openHostCreate() {
 async function onHostCreate() {
   hostCreate.busy = true
   hostCreate.error = ''
+  hostCreate.progressLabel = ''
+  hostCreate.progressPercent = 0
+  if (!offHostProgress) offHostProgress = onHostServerProgress(onHostCreateProgress)
   try {
     const input: HostServerCreateInput = {
       name: hostCreate.name,
@@ -71,6 +85,8 @@ async function onHostCreate() {
     hostCreate.error = errText(e)
   } finally {
     hostCreate.busy = false
+    hostCreate.progressLabel = ''
+    if (offHostProgress) { offHostProgress(); offHostProgress = null }
   }
 }
 async function onHostStart(id: string) {
@@ -234,7 +250,7 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
           <div class="modal-actions">
             <button class="btn btn-ghost" :disabled="hostCreate.busy" @click="hostCreate.open = false">取消</button>
             <button class="btn btn-gold" :disabled="hostCreate.busy || !hostCreate.name.trim() || !hostCreate.mcVersion" @click="onHostCreate">
-              {{ hostCreate.busy ? '创建中…' : '创建并启动' }}
+              {{ hostCreateBusyText }}
             </button>
           </div>
         </div>

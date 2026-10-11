@@ -7,6 +7,7 @@ import { randomUUID } from 'node:crypto'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { getVersionJson, fetchVersionManifest } from './versions'
 import { downloadAll, type DownloadTask } from './download'
+import { getSettings } from './settings'
 import { downloadFetch } from './downloadFetch'
 import { scanJava } from './java'
 import { pingServer } from './servers'
@@ -143,7 +144,10 @@ export function listHostServers(): HostServerRecord[] {
   return readHostServers()
 }
 
-export async function createHostServer(input: HostServerCreateInput): Promise<HostServerRecord> {
+/** 创建进度回调：阶段标签 + 0-100 百分比 */
+export type HostCreateProgress = (label: string, percent: number) => void
+
+export async function createHostServer(input: HostServerCreateInput, onProgress?: HostCreateProgress): Promise<HostServerRecord> {
   const name = (input.name ?? '').trim()
   if (!name) throw new Error('请填写服务器名称')
   if (name.length > 40) throw new Error('服务器名称过长（最多 40 字符）')
@@ -171,6 +175,8 @@ export async function createHostServer(input: HostServerCreateInput): Promise<Ho
   }
   // 下载服务端 jar：数据包服务器 = 原版服务端；模组服务器 = Fabric 服务端
   hostLog.info(`下载 ${entry.id}${type === 'modded' ? '（Fabric 模组）' : ''}服务端…`)
+  const mirror = getSettings().mirror
+  onProgress?.('获取版本信息', 2)
   if (type === 'modded') {
     // Fabric Loader 版本列表：https://meta.fabricmc.net/v2/versions/loader/<mc>
     const loaderRes = await downloadFetch(`https://meta.fabricmc.net/v2/versions/loader/${encodeURIComponent(entry.id)}`, { signal: AbortSignal.timeout(15000) })
@@ -181,15 +187,17 @@ export async function createHostServer(input: HostServerCreateInput): Promise<Ho
     }
     const loaderVersion = loaderList[0].loader.version
     const serverUrl = `https://meta.fabricmc.net/v2/versions/loader/${encodeURIComponent(entry.id)}/${encodeURIComponent(loaderVersion)}/server/jar`
+    onProgress?.('下载 Fabric 服务端', 5)
     await downloadAll([
       {
         url: serverUrl,
         urls: [serverUrl],
         dest: serverJar(id)
       }
-    ])
+    ], (done, total) => onProgress?.('下载 Fabric 服务端', 5 + Math.round((done / Math.max(1, total)) * 90)), 1, mirror)
     fs.mkdirSync(path.join(dir, 'mods'), { recursive: true })
   } else {
+    onProgress?.('获取版本信息', 2)
     const vj = await getVersionJson(entry.id, path.join(dir, 'version.json'))
     const server = (vj.downloads as { server?: { url?: string; sha1?: string; size?: number } } | undefined)?.server
     if (!server?.url) throw new Error(`版本 ${entry.id} 未提供服务端下载`)
@@ -201,9 +209,11 @@ export async function createHostServer(input: HostServerCreateInput): Promise<Ho
         size: server.size
       }
     ]
-    await downloadAll(tasks)
+    onProgress?.('下载原版服务端', 5)
+    await downloadAll(tasks, (done, total) => onProgress?.('下载原版服务端', 5 + Math.round((done / Math.max(1, total)) * 90)), 1, mirror)
     fs.mkdirSync(path.join(dir, 'world', 'datapacks'), { recursive: true })
   }
+  onProgress?.('写入配置', 97)
   // 基础配置：同意 EULA；离线服（online-mode 由用户控制）
   fs.writeFileSync(path.join(dir, 'eula.txt'), 'eula=true\n', 'utf-8')
   fs.writeFileSync(
@@ -221,6 +231,7 @@ export async function createHostServer(input: HostServerCreateInput): Promise<Ho
   )
   record.jarReady = true
   upsertRecord(record)
+  onProgress?.('创建完成', 100)
   hostLog.info(`服务器「${name}」创建完成（${entry.id}${type === 'modded' ? ' · Fabric 模组' : ' · 数据包'}，端口 ${port}）`)
   return record
 }
