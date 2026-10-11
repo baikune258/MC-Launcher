@@ -1,8 +1,8 @@
 {
-  "latest": "1.1.47",
-  "assetName": "MC-Launcher-1.1.47.exe",
-  "assetUrl": "https://github.com/baikune258/MC-Launcher/releases/download/v1.1.47/MC-Launcher-1.1.47.exe",
-  "publishedAt": "2026-10-12T12:30:00Z",
-  "body": "修复了一些BUG或问题",
-  "sha256SumsUrl": "https://github.com/baikune258/MC-Launcher/releases/download/v1.1.47/SHA256SUMS.txt"
+  "latest": "1.1.48",
+  "assetName": "MC-Launcher-1.1.48.exe",
+  "assetUrl": "https://github.com/baikune258/MC-Launcher/releases/download/v1.1.48/MC-Launcher-1.1.48.exe",
+  "publishedAt": "2026-10-12T13:30:00Z",
+  "body": "新增设置：自定义微软登录应用",
+  "sha256SumsUrl": "https://github.com/baikune258/MC-Launcher/releases/download/v1.1.48/SHA256SUMS.txt"
 }
