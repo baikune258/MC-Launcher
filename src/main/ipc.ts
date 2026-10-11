@@ -103,6 +103,8 @@ import type { DirectHostRequest } from '../shared/directConnect'
 import { registerVoxlinkIpc } from './core/voxlink'
 import { registerTerracottaIpc } from './core/terracotta'
 import { registerFrpIpc, installFrpEventBridge } from './core/frpIpc'
+import { registerHostServerIpc } from './core/hostServerIpc'
+import { resumeHostServers } from './core/hostServer'
 
 function errText(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
@@ -148,6 +150,7 @@ export function registerIpc(getWin: () => BrowserWindow | null): void {
   registerTerracottaIpc(ipcMain)
   registerFrpIpc(ipcMain)
   installFrpEventBridge(getWin)
+  registerHostServerIpc(ipcMain)
   const send = (channel: string, payload: unknown): void => {
     const window = getWin()
     if (window && !window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send(channel, payload)
@@ -160,6 +163,8 @@ export function registerIpc(getWin: () => BrowserWindow | null): void {
     const states = activeLaunchStates()
     for (const state of states) send(IPC_EVENT.launchState, state)
     if (!states.length) launch.restoreRunningGame(state => send(IPC_EVENT.launchState, state))
+    // 自动拉起「一直开」的在线服务器（异步执行，不阻塞启动）
+    resumeHostServers()
   })
   ipcMain.handle(IPC.appearanceResetTheme, () => resetVisualTheme())
   ipcMain.handle(IPC.appearanceExportTheme, (_e, preview) => exportVisualTheme(preview?appearanceDraft.appearanceOnly(preview):undefined))

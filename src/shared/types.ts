@@ -729,6 +729,15 @@ export const IPC = {
   settingsGet: 'settings:get',
   settingsSet: 'settings:set', // (patch: Partial<Settings>) => Settings
   appSystemInfo: 'app:systemInfo', // () => SystemInfo  真实物理内存等系统信息
+  // 在线服务器（自建常驻服）
+  hostServerList: 'host-server:list', // () => HostServerRecord[]
+  hostServerCreate: 'host-server:create', // (input) => HostServerRecord
+  hostServerStart: 'host-server:start', // (id) => HostServerStatus
+  hostServerStop: 'host-server:stop', // (id) => void
+  hostServerStatus: 'host-server:status', // (id) => HostServerStatus
+  hostServerLog: 'host-server:log', // (id) => string
+  hostServerDelete: 'host-server:delete', // (id) => void
+  hostServerResume: 'host-server:resume', // () => void
   appSelectDir: 'app:selectDir', // () => string | null
   appSelectFile: 'app:selectFile', // () => string | null  选择整合包文件（.mrpack/.zip）
   // 插件系统（userData/plugins/<id>/{plugin.json,main.js}，JS 插件在页面上下文执行）
@@ -1351,6 +1360,42 @@ export interface ServerPingResult {
   motd: string
   version: string
   latencyMs: number
+}
+
+/** 在线服务器（自建常驻服）记录 */
+export interface HostServerRecord {
+  id: string
+  name: string
+  mcVersion: string
+  port: number
+  ramMb: number
+  /** 启动器启动时自动拉起（一直开） */
+  autoResume: boolean
+  /** 正版验证（online-mode），默认关闭便于离线加入 */
+  onlineMode: boolean
+  createdAt: number
+  pid?: number
+  jarReady: boolean
+}
+
+/** 在线服务器运行状态 */
+export interface HostServerStatus {
+  running: boolean
+  online: boolean
+  players?: number
+  motd?: string
+  address: string
+  logTail: string
+}
+
+/** 创建在线服务器的输入 */
+export interface HostServerCreateInput {
+  name: string
+  mcVersion: string
+  port?: number
+  ramMb?: number
+  autoResume?: boolean
+  onlineMode?: boolean
 }
 
 export interface SystemInfo extends Partial<import('./platform').PlatformInfo> {

@@ -38,6 +38,9 @@ import type {
   ProfileSkins,
   RemoteVersion,
   ServerEntry,
+  HostServerRecord,
+  HostServerStatus,
+  HostServerCreateInput,
   ServerLaunchPreparation,
   ServerPingResult,
   ServerSyncResult,
@@ -462,3 +465,13 @@ export function formatSpeed(bytes?: number): string {
 }
 
 export const importResources = (files: string[], id: string, folder: string, kind: string) => invoke<number>(IPC.fsImportResources, files, id, folder, kind)
+
+// ---------------- 在线服务器（自建常驻服） ----------------
+export const listHostServers = () => invoke<HostServerRecord[]>(IPC.hostServerList)
+export const createHostServer = (input: HostServerCreateInput) => invoke<HostServerRecord>(IPC.hostServerCreate, input)
+export const startHostServer = (id: string) => invoke<HostServerStatus>(IPC.hostServerStart, id)
+export const stopHostServer = (id: string) => invoke<void>(IPC.hostServerStop, id)
+export const hostServerStatus = (id: string) => invoke<HostServerStatus>(IPC.hostServerStatus, id)
+export const hostServerLog = (id: string) => invoke<string>(IPC.hostServerLog, id)
+export const deleteHostServer = (id: string) => invoke<void>(IPC.hostServerDelete, id)
+export const resumeHostServers = () => invoke<void>(IPC.hostServerResume)
