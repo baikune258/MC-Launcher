@@ -1,7 +1,7 @@
 {
   "name": "kamucl",
   "productName": "MC-Launcher",
-  "version": "1.1.39",
+  "version": "1.1.40",
   "description": "KAMUCL - 简约美观的一键式 Minecraft 启动器",
   "homepage": "https://github.com/kamubaba-i/KAMUCL",
   "main": "out/main/index.js",

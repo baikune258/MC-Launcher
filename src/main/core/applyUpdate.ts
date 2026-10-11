@@ -137,6 +137,14 @@ export function cleanupUpdateRemnants(): void {
   const exe = currentPortableExe()
   if (!exe) return
   const base = path.dirname(exe)
+  // 0. 先判断是否存在活动更新事务（下载完成待应用/正在应用），存在则本轮不清除暂存更新包，
+  //    否则会把已下载好的新版本删掉，造成「重启后仍是老版本」
+  let hasActiveTransaction = false
+  try {
+    for (const name of fs.readdirSync(base)) {
+      if (name.startsWith('.mclauncherupdate') || name.startsWith('.kamuclupdate')) { hasActiveTransaction = true; break }
+    }
+  } catch { /* 目录不可读则视为无标记 */ }
   // 1. 更新标记残留（新旧两套命名都清）
   try {
     for (const name of fs.readdirSync(base)) {
@@ -145,9 +153,11 @@ export function cleanupUpdateRemnants(): void {
       }
     }
   } catch { /* 目录不可读则跳过 */ }
-  // 2. MC-Launcher-update 残留下载包与空目录（含旧命名 KAMUCL-update）
-  try { fs.rmSync(path.join(base, 'MC-Launcher-update'), { recursive: true, force: true }) } catch { /* 跳过 */ }
-  try { fs.rmSync(path.join(base, 'KAMUCL-update'), { recursive: true, force: true }) } catch { /* 跳过 */ }
+  // 2. MC-Launcher-update 残留下载包与空目录（含旧命名 KAMUCL-update）；有活动事务时保留
+  if (!hasActiveTransaction) {
+    try { fs.rmSync(path.join(base, 'MC-Launcher-update'), { recursive: true, force: true }) } catch { /* 跳过 */ }
+    try { fs.rmSync(path.join(base, 'KAMUCL-update'), { recursive: true, force: true }) } catch { /* 跳过 */ }
+  }
   // 3. 旧命名 KAMUCL-backup 迁移到 MC-Launcher-backup（只保留可回退的最新备份）
   try {
     const legacyBackup = path.join(base, 'KAMUCL-backup')
@@ -206,7 +216,20 @@ export async function applyUpdateOnStartup(): Promise<boolean> {
     let alive = true
     if (previous?.helperPid) { try { process.kill(previous.helperPid, 0) } catch { alive = false } }
     else { try { alive = Date.now() - fs.statSync(claim).mtimeMs < 180_000 } catch { /* leave unowned records alone */ } }
-    if (alive) return false
+    if (alive) {
+      // 更新助手正在替换启动器：不要打开旧版窗口。等待助手完成（替换成功后助手会自行
+      // 拉起新版本并清理 claim），随后退出当前旧版实例，避免出现「重启后仍是老版本」。
+      updateLog.info('检测到更新正在应用中，等待新版自动启动（最长 15s）')
+      for (let n = 0; n < 30; n++) {
+        if (!fs.existsSync(claim)) {
+          updateLog.info('更新已由助手完成并清理标记，退出当前旧版实例')
+          app.exit(0)
+          return true
+        }
+        await new Promise(resolve => setTimeout(resolve, 500))
+      }
+      updateLog.info('等待更新完成超时，按中断处理恢复打开旧版')
+    }
     // Interrupted helpers are quarantined, not restarted. A new explicit download may proceed.
     try { fs.renameSync(claim, claim + '.failed') } catch { return false }
   }
