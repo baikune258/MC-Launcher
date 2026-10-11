@@ -1,8 +1,8 @@
 {
-  "latest": "1.1.42",
-  "assetName": "MC-Launcher-1.1.42.exe",
-  "assetUrl": "https://github.com/baikune258/MC-Launcher/releases/download/v1.1.42/MC-Launcher-1.1.42.exe",
-  "publishedAt": "2026-10-11T12:00:00Z",
-  "body": "修复了一些BUG或问题",
-  "sha256SumsUrl": "https://github.com/baikune258/MC-Launcher/releases/download/v1.1.42/SHA256SUMS.txt"
+  "latest": "1.1.43",
+  "assetName": "MC-Launcher-1.1.43.exe",
+  "assetUrl": "https://github.com/baikune258/MC-Launcher/releases/download/v1.1.43/MC-Launcher-1.1.43.exe",
+  "publishedAt": "2026-10-11T07:15:00Z",
+  "body": "新增：在线服务器支持数据包服务器（原版，可装 .zip 数据包）与模组服务器（Fabric，可装 .jar 模组）；新增：游戏启动选项——自定义游戏窗口标题与自定义信息、启动器可见性（保持/最小化/隐藏）、进程优先级（低/正常/高/实时）",
+  "sha256SumsUrl": "https://github.com/baikune258/MC-Launcher/releases/download/v1.1.43/SHA256SUMS.txt"
 }
