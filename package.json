@@ -24,6 +24,7 @@
   "build": {
     "appId": "com.baikun.mclauncher",
     "productName": "MC-Launcher",
+    "copyright": "Copyright (C) 2026 baikun",
     "directories": {
       "output": "release"
     },
@@ -56,12 +57,6 @@
     "beforePack": "scripts/portable-build-hook.cjs",
     "afterPack": "scripts/verify-windows-runtime.cjs",
     "win": {
-      "versionInfo": {
-        "FileDescription": "MC-Launcher - 属于你的我的世界启动器",
-        "ProductName": "MC-Launcher",
-        "CompanyName": "baikun",
-        "LegalCopyright": "Copyright (C) 2026 baikun"
-      },
       "files": [
         "out/main/**",
         "out/preload/**",
