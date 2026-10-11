@@ -13,6 +13,7 @@ import {
   uploadHostServerDatapack,
   uploadHostServerMod,
   onHostServerProgress,
+  openHostServerFolder,
   getManifest
 } from '../api'
 import { toast } from '../store'
@@ -141,6 +142,10 @@ async function onHostUploadDatapack(id: string) {
     hostUploadBusy.value = ''
   }
 }
+async function onHostOpenFolder(id: string) {
+  try { await openHostServerFolder(id) }
+  catch (e) { toast('打开文件夹失败：' + errText(e), 'error') }
+}
 async function onHostUploadMod(id: string) {
   hostUploadBusy.value = id
   try {
@@ -204,6 +209,7 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
           <div class="host-card-actions">
             <button v-if="s.type === 'datapack'" class="btn btn-ghost btn-sm" :disabled="hostUploadBusy === s.id" @click="onHostUploadDatapack(s.id)">上传数据包</button>
             <button v-else class="btn btn-ghost btn-sm" :disabled="hostUploadBusy === s.id" @click="onHostUploadMod(s.id)">上传模组</button>
+            <button class="btn btn-ghost btn-sm" @click="onHostOpenFolder(s.id)">打开文件夹</button>
             <button class="btn btn-ghost btn-sm" :disabled="hostBusy === s.id" @click="copyHostAddress(s.id)">复制地址</button>
             <button v-if="!hostStatus[s.id]?.running" class="btn btn-gold btn-sm" :disabled="hostBusy === s.id" @click="onHostStart(s.id)">启动</button>
             <button v-else class="btn btn-danger btn-sm" :disabled="hostBusy === s.id" @click="onHostStop(s.id)">停止</button>

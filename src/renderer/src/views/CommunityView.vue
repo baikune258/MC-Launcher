@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import ContentSkeleton from '../components/ContentSkeleton.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import { communityFiles, communitySearch, errText, getManifest, getModTargets } from '../api'
+import { communityFiles, communitySearch, errText, getManifest, getModTargets, listHostServers, installModpackToServer } from '../api'
 import { store, toast, selectedInstance, displayVersionName as versionLabel } from '../store'
 import { instanceKey } from '@shared/modCompatibility'
 import { communityFileMatchesInstance, usesCommunityLoader } from '@shared/communityPolicy'
@@ -26,7 +26,7 @@ import type {
   CommunitySource,
   LoaderName
 } from '@shared/types'
-import type { InstalledVersion } from '@shared/types'
+import type { HostServerRecord, InstalledVersion } from '@shared/types'
 
 // ---------------- 资源外链（源页面 + MC 百科介绍） ----------------
 /** CurseForge 的 URL 分类段（按当前搜索分类推断） */
@@ -410,7 +410,15 @@ const modal = reactive({
   fileId: '',
   versionId: '',
   mcVersion: '',
-  loader: '' as LoaderName | ''
+  loader: '' as LoaderName | '',
+  packTarget: 'instance' as 'instance' | 'server',
+  serverId: ''
+})
+
+const hostServers = ref<HostServerRecord[]>([])
+const moddedServers = computed(() => hostServers.value.filter((s) => s.type === 'modded'))
+watch(moddedServers, (list) => {
+  if (!list.some((s) => s.id === modal.serverId)) modal.serverId = list[0]?.id ?? ''
 })
 
 const isModpack = computed(() => modal.kind === 'modpack')
@@ -450,8 +458,11 @@ async function openDownload(item: CommunityProjectReference, kind: CommunityKind
   modal.filesError = ''
   modal.fileId = ''
   modal.versionId = currentInstance.value ? instanceKey(currentInstance.value) : ''
+  modal.packTarget = 'instance'
+  modal.serverId = ''
   modal.mcVersion = query.mcVersion
   modal.loader = usesCommunityLoader(kind) ? query.loader : ''
+  if (kind === 'modpack') void listHostServers().then((list) => { hostServers.value = list }).catch(() => { hostServers.value = [] })
   try {
     const scanned = await getModTargets()
     if (disposed || generation !== openGeneration || !modal.open) return
@@ -475,6 +486,19 @@ const canConfirm = computed(
 function confirmDownload() {
   const file = selectedFile.value
   if (!file || !canConfirm.value) return
+  if (isModpack.value && modal.packTarget === 'server') {
+    if (!modal.serverId) { toast('请先选择在线服务器（模组服务器）', 'error'); return }
+    void (async () => {
+      try {
+        const { mods, overrides } = await installModpackToServer(file, modal.serverId)
+        modal.open = false; fileGeneration++; openGeneration++
+        toast(`整合包已装入服务器：${mods} 个模组${overrides ? ` / ${overrides} 个覆盖文件` : ''}，重启服务器后生效`, 'success')
+      } catch (e) {
+        toast('安装到服务器失败：' + errText(e), 'error')
+      }
+    })()
+    return
+  }
   const target = isModpack.value ? undefined : targetOptions.value.find(v => instanceKey(v) === modal.versionId)
   try {
     const folder = target?.folder || store.settings?.folders.find(folder => folder.isDefault)?.path || store.settings?.gameDir || ''
@@ -715,7 +739,25 @@ function confirmDownload() {
             <SelectMenu aria-label="下载目标实例" v-if="targetOptions.length" v-model="modal.versionId" :options="targetOptions.map(v => ({value:instanceKey(v),label:v.id+' · '+v.mcVersion+' / '+(v.loader || '纯净版')+' · '+v.folder}))" />
             <p data-ui="CommunityView:ab12acbb18fe" v-else class="files-error">没有与所选文件兼容的已安装实例；可调整文件筛选，或在游戏版本页安装。</p>
           </template>
-          <p data-ui="CommunityView:a8e08b82f315" v-else class="muted pack-tip">整合包将下载后自动创建独立实例并安装</p>
+          <template v-else>
+            <p class="modal-label">安装到</p>
+            <div class="pack-target-row">
+              <label class="version-source-option" :class="{ active: modal.packTarget === 'instance' }">
+                <input v-model="modal.packTarget" type="radio" value="instance" />
+                <span>客户端实例（自动创建独立实例）</span>
+              </label>
+              <label class="version-source-option" :class="{ active: modal.packTarget === 'server' }">
+                <input v-model="modal.packTarget" type="radio" value="server" />
+                <span>在线服务器（模组服务器 · Fabric）</span>
+              </label>
+            </div>
+            <template v-if="modal.packTarget === 'server'">
+              <p class="modal-label">选择服务器</p>
+              <SelectMenu v-if="moddedServers.length" v-model="modal.serverId" :options="moddedServers.map(s => ({value: s.id, label: s.name + ' · ' + s.mcVersion + ' · 端口 ' + s.port}))" />
+              <p data-ui="CommunityView:ab12acbb18fe" v-else class="files-error">没有模组服务器。请先在「在线服务器」创建模组服务器，再回来安装整合包。</p>
+            </template>
+            <p data-ui="CommunityView:a8e08b82f315" v-else class="muted pack-tip">整合包将下载后自动创建独立实例并安装</p>
+          </template>
 
           <div data-ui="CommunityView:2356b94bbc0d" class="modal-actions">
             <button data-ui="CommunityView:989d28842ec5" class="btn btn-ghost" @click="modal.open = false">取消</button>
@@ -731,6 +773,8 @@ function confirmDownload() {
 </template>
 
 <style scoped>
+.pack-target-row { display:flex; flex-wrap:wrap; gap:var(--space-2); }
+.pack-target-row .version-source-option { margin:0; }
 .community-sections { display:flex;align-items:center;gap:6px;padding:4px;background:var(--card-2);border:1px solid var(--border);border-radius:var(--radius-md);align-self:flex-start; }
 .community-section { display:flex;align-items:center;justify-content:center;gap:8px;min-height:36px;border:0;border-radius:var(--radius-sm);padding:0 16px;background:transparent;color:var(--text-dim);font:inherit;font-size:13px;cursor:pointer;transition:background 160ms,color 160ms; }
 .community-section.active { background:var(--accent-soft);color:var(--accent-2);font-weight:600; }

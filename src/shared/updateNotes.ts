@@ -8,6 +8,7 @@ export interface UpdateNote {
 
 /** 按版本倒序；latest 为当前版本 */
 export const updateNotes: UpdateNote[] = [
+  {"version":"1.1.49","date":"2026-10-12 14:00","changes":["整合包可直接安装到在线模组服务器","服务器支持打开文件夹管理模组/数据包"]},
   {"version":"1.1.48","date":"2026-10-12 13:00","changes":["新增设置：自定义微软登录应用"]},
   {"version":"1.1.47","date":"2026-10-12 12:00","changes":["修复了一些BUG或问题"]},
   {"version":"1.1.46","date":"2026-10-12 11:30","changes":["修复了一些BUG或问题"]},

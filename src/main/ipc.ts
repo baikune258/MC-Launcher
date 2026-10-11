@@ -104,7 +104,7 @@ import { registerVoxlinkIpc } from './core/voxlink'
 import { registerTerracottaIpc } from './core/terracotta'
 import { registerFrpIpc, installFrpEventBridge } from './core/frpIpc'
 import { registerHostServerIpc } from './core/hostServerIpc'
-import { resumeHostServers, uploadHostServerDatapack, uploadHostServerMod } from './core/hostServer'
+import { resumeHostServers, uploadHostServerDatapack, uploadHostServerMod, listHostServers, openHostServerFolder } from './core/hostServer'
 
 function errText(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
@@ -163,6 +163,20 @@ export function registerIpc(getWin: () => BrowserWindow | null): void {
     const r = getWin() ? await dialog.showOpenDialog(getWin()!, opts) : await dialog.showOpenDialog(opts)
     if (r.canceled || !r.filePaths[0]) return null
     return uploadHostServerMod(String(id ?? ''), r.filePaths[0])
+  })
+  // 在线服务器：打开服务器文件夹（mods / world 等）
+  ipcMain.handle(IPC.hostServerOpenFolder, (_e, id: string) => {
+    const dir = openHostServerFolder(String(id ?? ''))
+    void shell.openPath(dir).then((error) => { if (error) dialog.showErrorBox('无法打开服务器文件夹', error) })
+  })
+  // 在线服务器：安装整合包（社区资源下载 → 装到模组服务器 mods 目录）
+  ipcMain.handle(IPC.hostServerInstallModpack, async (_e, file: CommunityFile, serverId: string) => {
+    const id = String(serverId ?? '')
+    const rec = listHostServers().find((s) => s.id === id)
+    if (!rec) throw new Error('服务器不存在')
+    if (rec.type !== 'modded') throw new Error('只有模组服务器（Fabric）支持安装整合包')
+    const { installCommunityModpackToServer } = await import('./core/community')
+    return installCommunityModpackToServer(file, id)
   })
   const send = (channel: string, payload: unknown): void => {
     const window = getWin()

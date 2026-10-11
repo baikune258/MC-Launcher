@@ -9,6 +9,9 @@ import { getVersionJson, fetchVersionManifest } from './versions'
 import { downloadAll, type DownloadTask } from './download'
 import { getSettings } from './settings'
 import { downloadFetch } from './downloadFetch'
+import AdmZip from 'adm-zip'
+import { resolveCurseForgeDownload } from './curseforgeDownload'
+import { cfChannel } from './curseforgeChannel'
 import { scanJava } from './java'
 import { pingServer } from './servers'
 import { logScope } from './launcherLog'
@@ -408,4 +411,147 @@ export function resumeHostServers(): void {
       }
     }
   })()
+}
+
+// ---------------- 整合包安装到服务器 ----------------
+/** 规范化压缩包内路径（统一斜杠、去 ./ 前缀）。 */
+function normPackEntry(name: string): string {
+  return name.replace(/\\/g, '/').replace(/^\.\//, '')
+}
+
+/** 服务器目录内安全拼接：拒绝越界路径。 */
+function safeServerJoin(root: string, rel: string): string {
+  const p = path.resolve(root, rel)
+  if (p !== root && !p.startsWith(root + path.sep)) throw new Error(`整合包路径越界：${rel}`)
+  return p
+}
+
+/** CurseForge 下载元数据源（与 modpacks.ts 同策略：官方 key / mcimirror 镜像）。 */
+async function hostCfSources(): Promise<Array<{ base: string; headers?: Record<string, string> }>> {
+  const channel = cfChannel()
+  const official = { base: channel.base, headers: channel.official ? { 'x-api-key': channel.key } : undefined }
+  const mirror = { base: 'https://mod.mcimirror.top/curseforge/v1' }
+  return channel.official ? (getSettings().mirror === 'bmclapi' ? [mirror, official] : [official, mirror]) : [mirror]
+}
+
+/** 把整合包 overrides/server-overrides 里的文件应用（复制）到服务器根目录。 */
+function applyOverridesToServer(tmp: string, serverRoot: string, prefix: string): number {
+  const src = path.join(tmp, prefix)
+  if (!fs.existsSync(src)) return 0
+  let n = 0
+  const walk = (dir: string, rel: string): void => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const r = rel ? `${rel}/${e.name}` : e.name
+      if (e.isDirectory()) walk(path.join(dir, e.name), r)
+      else {
+        const dest = safeServerJoin(serverRoot, r)
+        fs.mkdirSync(path.dirname(dest), { recursive: true })
+        fs.copyFileSync(path.join(dir, e.name), dest)
+        n++
+      }
+    }
+  }
+  walk(src, '')
+  return n
+}
+
+/** 自包含整合包：把 mods/ 下的 jar 复制到服务器 mods 目录。 */
+function copyModsFromTree(tmp: string, modsDir: string): number {
+  const src = path.join(tmp, 'mods')
+  if (!fs.existsSync(src)) return 0
+  let n = 0
+  for (const e of fs.readdirSync(src, { withFileTypes: true })) {
+    if (e.isFile() && /\.jar$/i.test(e.name)) {
+      fs.copyFileSync(path.join(src, e.name), path.join(modsDir, e.name))
+      n++
+    }
+  }
+  return n
+}
+
+/**
+ * 把整合包（Modrinth .mrpack / CurseForge .zip / 自包含 zip）安装到模组服务器。
+ * mrpack 按清单下载 mods；CurseForge 按 manifest 解析下载；自包含 zip 直接解压 mods。
+ * overrides / server-overrides 应用到服务器目录。返回 { mods, overrides }。
+ */
+export async function installModpackToHostServer(id: string, filePath: string, onProgress?: HostCreateProgress): Promise<{ mods: number; overrides: number }> {
+  const record = findRecord(id)
+  if (!record) throw new Error('服务器不存在')
+  if (record.type !== 'modded') throw new Error('只有模组服务器（Fabric）支持安装整合包')
+  const src = String(filePath ?? '')
+  if (!src.trim() || !fs.existsSync(src) || !fs.statSync(src).isFile()) throw new Error('整合包文件不存在')
+  const serverRoot = serverDir(id)
+  const modsDir = path.join(serverRoot, 'mods')
+  fs.mkdirSync(modsDir, { recursive: true })
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mc-launcher-hostpack-'))
+  try {
+    const zip = new AdmZip(src)
+    const names = new Set(zip.getEntries().map((e) => normPackEntry(e.entryName)))
+    zip.extractAllTo(tmp, true)
+    let mods = 0, overrides = 0
+    if (names.has('modrinth.index.json')) {
+      onProgress?.('解析 Modrinth 整合包', 5)
+      const idx = JSON.parse(fs.readFileSync(path.join(tmp, 'modrinth.index.json'), 'utf8')) as {
+        files?: Array<{ path?: string; downloads?: string[]; size?: number }>
+      }
+      const tasks: DownloadTask[] = []
+      for (const f of idx.files ?? []) {
+        const p = normPackEntry(f.path ?? '')
+        if (!p.startsWith('mods/') || !/\.jar$/i.test(p)) continue
+        const url = (f.downloads ?? []).find((u) => typeof u === 'string' && /^https?:/.test(u))
+        if (!url) continue
+        tasks.push({ url, urls: [url], dest: path.join(modsDir, path.basename(p)), size: f.size })
+      }
+      for (let i = 0; i < tasks.length; i += 8) {
+        const batch = tasks.slice(i, i + 8)
+        await downloadAll(batch, (d, t) => onProgress?.('下载整合包模组', 10 + Math.round(((i + d / Math.max(1, t)) / tasks.length) * 80)), 4, getSettings().mirror)
+      }
+      mods = tasks.length
+      overrides += applyOverridesToServer(tmp, serverRoot, 'overrides') + applyOverridesToServer(tmp, serverRoot, 'server-overrides')
+    } else if (names.has('manifest.json')) {
+      onProgress?.('解析 CurseForge 整合包', 5)
+      const mf = JSON.parse(fs.readFileSync(path.join(tmp, 'manifest.json'), 'utf8')) as {
+        files?: Array<{ projectID?: number; fileID?: number }>
+      }
+      const sources = await hostCfSources()
+      const files = (mf.files ?? []).filter((f) => Number.isSafeInteger(f?.projectID) && Number.isSafeInteger(f?.fileID))
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i] as { projectID: number; fileID: number }
+        try {
+          const dl = await resolveCurseForgeDownload(f.projectID, f.fileID, sources, AbortSignal.timeout(15000))
+          await downloadAll([{ url: dl.url, urls: [dl.url], dest: path.join(modsDir, dl.fileName), sha1: dl.sha1, size: dl.size }], (d, t) => onProgress?.('下载整合包模组', 10 + Math.round(((i + d / Math.max(1, t)) / files.length) * 80)), 1, getSettings().mirror)
+          mods++
+        } catch (err) {
+          hostLog.warn(`整合包模组下载失败（${f.projectID}/${f.fileID}）：${String(err)}`)
+        }
+      }
+      overrides += applyOverridesToServer(tmp, serverRoot, 'overrides') + applyOverridesToServer(tmp, serverRoot, 'server-overrides')
+    } else {
+      onProgress?.('解压整合包', 5)
+      mods = copyModsFromTree(tmp, modsDir)
+      overrides += applyOverridesToServer(tmp, serverRoot, 'overrides') + applyOverridesToServer(tmp, serverRoot, 'server-overrides')
+      const dpSrc = path.join(tmp, 'datapacks')
+      if (fs.existsSync(dpSrc)) {
+        const dpDst = path.join(serverRoot, 'world', 'datapacks')
+        fs.mkdirSync(dpDst, { recursive: true })
+        for (const e of fs.readdirSync(dpSrc, { withFileTypes: true })) {
+          if (e.isFile() && /\.zip$/i.test(e.name)) fs.copyFileSync(path.join(dpSrc, e.name), path.join(dpDst, e.name))
+        }
+      }
+    }
+    onProgress?.('安装完成', 100)
+    hostLog.info(`整合包已装入服务器「${record.name}」：${mods} 个模组 / ${overrides} 个覆盖文件`)
+    return { mods, overrides }
+  } finally {
+    try { fs.rmSync(tmp, { recursive: true, force: true }) } catch { /* 忽略清理失败 */ }
+  }
+}
+
+/** 打开服务器数据文件夹（mods / world 等），返回目录路径。 */
+export function openHostServerFolder(id: string): string {
+  const record = findRecord(id)
+  if (!record) throw new Error('服务器不存在')
+  const dir = serverDir(id)
+  fs.mkdirSync(dir, { recursive: true })
+  return dir
 }

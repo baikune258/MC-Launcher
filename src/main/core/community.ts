@@ -784,3 +784,36 @@ async function communityDownloadInFolder(
   await transfer(dest)
   return dest
 }
+
+
+/** 从社区资源下载整合包并安装到在线服务器（模组服务器）。返回 { mods, overrides }。 */
+export async function installCommunityModpackToServer(
+  file: CommunityFile,
+  serverId: string,
+  emit?: ProgressEmit,
+  signal?: AbortSignal
+): Promise<{ mods: number; overrides: number }> {
+  const fileName = downloadFileName(String(file.fileName ?? ''))
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kamucl-pack-'))
+  const tmpPath = path.join(tmpRoot, fileName)
+  const cleanup = (): void => {
+    try { fs.rmSync(tmpRoot, { recursive: true, force: true }) }
+    catch (err) { communityLog.warn(`整合包临时文件清理失败：${tmpRoot}`, err) }
+  }
+  try {
+    await downloadAll(
+      [{ url: file.url, dest: tmpPath, sha1: file.sha1, size: file.size || undefined }],
+      (d, t) => emit?.({ stage: 'download', progress: t ? d / t : 0, text: '下载整合包…' }),
+      1,
+      getSettings().mirror,
+      signal
+    )
+    signal?.throwIfAborted()
+    const { installModpackToHostServer } = await import('./hostServer')
+    return await installModpackToHostServer(serverId, tmpPath, (label, percent) =>
+      emit?.({ stage: 'install', progress: percent / 100, text: label })
+    )
+  } finally {
+    cleanup()
+  }
+}
