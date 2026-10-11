@@ -169,23 +169,6 @@ export function registerIpc(getWin: () => BrowserWindow | null): void {
     const dir = openHostServerFolder(String(id ?? ''))
     void shell.openPath(dir).then((error) => { if (error) dialog.showErrorBox('无法打开服务器文件夹', error) })
   })
-  // 在线服务器：安装整合包（社区资源下载 → 装到模组服务器 mods 目录）
-  ipcMain.handle(IPC.hostServerInstallModpack, async (_e, file: CommunityFile, serverId: string) => {
-    const id = String(serverId ?? '')
-    const rec = listHostServers().find((s) => s.id === id)
-    if (!rec) throw new Error('服务器不存在')
-    if (rec.type !== 'modded') throw new Error('只有模组服务器（Fabric）支持安装整合包')
-    try {
-      const { installCommunityModpackToServer } = await import('./core/community')
-      return await installCommunityModpackToServer(file, id)
-    } catch (err) {
-      const msg = String((err as Error)?.message ?? err)
-      if (/(超时|timeout|ECONN|ENOTFOUND|getaddrinfo|fetch failed|Failed to fetch|连接失败|网络)/i.test(msg)) {
-        throw new Error('整合包下载失败：Modrinth 官方 CDN 连接超时或不可达。可稍后重试，或开启网络加速后重试。')
-      }
-      throw err
-    }
-  })
   const send = (channel: string, payload: unknown): void => {
     const window = getWin()
     if (window && !window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send(channel, payload)
@@ -642,6 +625,17 @@ export function registerIpc(getWin: () => BrowserWindow | null): void {
         emit({ ...normalized, taskId: task.id, taskTitle: task.title, ...(typeof operationId === 'string' && /^[a-zA-Z0-9:_-]{1,96}$/.test(operationId) ? { operationId } : {}) })
       }
       try {
+        if (target.serverId) {
+          const rec = listHostServers().find((s) => s.id === String(target.serverId ?? ''))
+          if (!rec) throw new Error('服务器不存在')
+          if (rec.type !== 'modded') throw new Error('只有模组服务器（Fabric）支持安装整合包')
+          taskEmit({ stage: 'download', progress: 0, indeterminate: true, text: '准备下载整合包…' })
+          const r = await community.installCommunityModpackToServer(file, rec.id, taskEmit, task.controller.signal)
+          // 服务器安装走社区队列的 taskDone 完成事件；installDone 属于游戏版本安装，不发送
+          send(IPC_EVENT.taskDone, { taskId: task.id, ok: true })
+          finishTask(task.id)
+          return `已装入服务器「${rec.name}」：${r.mods} 个模组${r.overrides ? ` / ${r.overrides} 个覆盖文件` : ''}`
+        }
         taskEmit({ stage: 'download', progress: 0, indeterminate: true, text: '准备下载资源…' })
         const r = await community.communityDownload(file, target, taskEmit, (done) => {
           const cancelled = done.error === '已取消'

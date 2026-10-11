@@ -225,7 +225,7 @@ export const communityFiles = (
 /** 下载资源文件，返回保存路径；kind=modpack 时自动进入整合包安装流程 */
 export const communityDownload = (
   file: CommunityFile,
-  target: { versionId: string; kind: CommunityKind; folder?: string },
+  target: { versionId: string; kind: CommunityKind; folder?: string; serverId?: string },
   operationId?: string
 ) => invoke<string>(IPC.communityDownload, file, target, operationId)
 
@@ -477,7 +477,6 @@ export const deleteHostServer = (id: string) => invoke<void>(IPC.hostServerDelet
 export const resumeHostServers = () => invoke<void>(IPC.hostServerResume)
 export const uploadHostServerDatapack = (id: string) => invoke<string | null>(IPC.hostServerUploadDatapack, id)
 export const uploadHostServerMod = (id: string) => invoke<string | null>(IPC.hostServerUploadMod, id)
-export const installModpackToServer = (file: CommunityFile, serverId: string) => invoke<{ mods: number; overrides: number }>(IPC.hostServerInstallModpack, file, serverId)
 export const openHostServerFolder = (id: string) => invoke<void>(IPC.hostServerOpenFolder, id)
 export const onHostServerProgress = (cb: (r: { label: string; percent: number }) => void) =>
   subscribe<{ label: string; percent: number }>(IPC_EVENT.hostServerProgress, cb)

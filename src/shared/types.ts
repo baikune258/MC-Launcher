@@ -751,7 +751,6 @@ export const IPC = {
   hostServerUploadDatapack: 'host-server:uploadDatapack', // (id) => string | null  弹窗选 zip 数据包并装入世界目录
   hostServerUploadMod: 'host-server:uploadMod', // (id) => string | null  弹窗选 jar 模组并装入 mods 目录
   hostServerOpenFolder: 'host-server:openFolder', // (id) => void  打开服务器文件夹（mods/世界等）
-  hostServerInstallModpack: 'host-server:installModpack', // (file: CommunityFile, serverId: string) => {mods,overrides}  下载整合包装到模组服务器
   appSelectDir: 'app:selectDir', // () => string | null
   appSelectFile: 'app:selectFile', // () => string | null  选择整合包文件（.mrpack/.zip）
   // 插件系统（userData/plugins/<id>/{plugin.json,main.js}，JS 插件在页面上下文执行）

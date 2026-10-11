@@ -15,7 +15,7 @@ export function useCommunityDownloadQueue() {
       cancel: cancelTask,
       uuid: () => crypto.randomUUID(),
       changed(item) {
-        if (item.state === 'completed') { store.fsRefreshTick++; toast(`${item.file.fileName}：${item.kind === 'modpack' ? '整合包安装完成' : item.result || '安装完成'}`, 'success') }
+        if (item.state === 'completed') { store.fsRefreshTick++; toast(`${item.file.fileName}：${item.kind === 'modpack' ? (item.serverId ? '整合包已装入服务器，重启服务器后生效' : '整合包安装完成') : item.result || '安装完成'}`, 'success') }
         else if (item.state === 'failed') toast(`${item.file.fileName}：${item.error}，可在社区队列重试`, 'error')
       }
     })

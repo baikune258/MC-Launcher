@@ -8,6 +8,8 @@ export interface CommunityDownloadRequest {
   target?: InstalledVersion
   /** The accepted default is captured even for packs, which create a new instance. */
   folder: string
+  /** 在线服务器 ID：整合包直接装入模组服务器 */
+  serverId?: string
 }
 export interface CommunityDownloadItem extends CommunityDownloadRequest {
   id: string
@@ -24,14 +26,14 @@ export interface CommunityDownloadPort {
   prepare(target: { id: string; folder: string }, input: { file: CommunityFile }, operationId: string): Promise<ModInstallPlan>
   commit(planId: string, operationId: string): Promise<string>
   discard(planId: string): Promise<unknown>
-  download(file: CommunityFile, target: { versionId: string; kind: CommunityKind; folder: string }, operationId: string): Promise<string>
+  download(file: CommunityFile, target: { versionId: string; kind: CommunityKind; folder: string; serverId?: string }, operationId: string): Promise<string>
   cancel(taskId: string): Promise<unknown>
   changed(item: CommunityDownloadItem): void
   uuid(): string
 }
 const terminal = (state: CommunityDownloadState) => ['completed', 'failed', 'cancelled'].includes(state)
 const folderKey = (folder: string) => /^[a-z]:[\\/]/i.test(folder) ? folder.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase() : folder.replace(/\/+$/, '')
-const identity = (request: CommunityDownloadRequest) => JSON.stringify([request.kind, request.file.source, request.file.projectId, request.file.fileId, folderKey(request.folder), request.target?.id ?? ''])
+const identity = (request: CommunityDownloadRequest) => JSON.stringify([request.kind, request.file.source, request.file.projectId, request.file.fileId, folderKey(request.folder), request.target?.id ?? '', request.serverId ?? ''])
 // IPC inputs must be plain immutable values; Vue proxies and later filter edits must not leak into a task.
 function snapshot<T>(value: T): T {
   const freeze = (v: any): any => { if (v && typeof v === 'object') { Object.values(v).forEach(freeze); Object.freeze(v) }; return v }
@@ -69,7 +71,9 @@ export function createCommunityDownloadQueue(port: CommunityDownloadPort) {
         finish(item, 'completed')
       } else {
         item.state = 'downloading'
-        item.result = await port.download(item.file, { versionId: item.target?.id ?? '', kind: item.kind, folder: item.folder }, item.operationId)
+        const dlTarget: { versionId: string; kind: CommunityKind; folder: string; serverId?: string } = { versionId: item.target?.id ?? '', kind: item.kind, folder: item.folder }
+        if (item.serverId) dlTarget.serverId = item.serverId
+        item.result = await port.download(item.file, dlTarget, item.operationId)
         if (item.kind === 'modpack') {
           const outcome = packOutcomes.get(item.id)
           if (outcome) finish(item, outcome.ok ? 'completed' : outcome.cancelled ? 'cancelled' : 'failed', outcome.error)
@@ -83,7 +87,8 @@ export function createCommunityDownloadQueue(port: CommunityDownloadPort) {
   function enqueue(request: CommunityDownloadRequest): { item: CommunityDownloadItem; added: boolean } {
     const existing = items.find(item => !terminal(item.state) && identity(item) === identity(request))
     if (existing) return { item: existing, added: false }
-    if (!request.folder || request.kind !== 'modpack' && !request.target) throw new Error('请选择已登记的目标实例')
+    if (!request.folder && !request.serverId) throw new Error('请选择已登记的目标实例或在线服务器')
+    if (request.kind !== 'modpack' && !request.target && !request.serverId) throw new Error('请选择已登记的目标实例')
     const frozen = snapshot(request)
     const item = reactive<CommunityDownloadItem>({ ...frozen, id: port.uuid(), state: 'queued', action: request.kind === 'mod' ? 'prepare' : 'resource', operationId: '', error: '', result: '', cancelRequested: false })
     items.push(item); void pump()

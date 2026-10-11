@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import ContentSkeleton from '../components/ContentSkeleton.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import { communityFiles, communitySearch, errText, getManifest, getModTargets, listHostServers, installModpackToServer } from '../api'
+import { communityFiles, communitySearch, errText, getManifest, getModTargets, listHostServers } from '../api'
 import { store, toast, selectedInstance, displayVersionName as versionLabel } from '../store'
 import { instanceKey } from '@shared/modCompatibility'
 import { communityFileMatchesInstance, usesCommunityLoader } from '@shared/communityPolicy'
@@ -488,16 +488,13 @@ function confirmDownload() {
   if (!file || !canConfirm.value) return
   if (isModpack.value && modal.packTarget === 'server') {
     if (!modal.serverId) { toast('请先选择在线服务器（模组服务器）', 'error'); return }
-    void (async () => {
-      try {
-        const { mods, overrides } = await installModpackToServer(file, modal.serverId)
-        modal.open = false; fileGeneration++; openGeneration++
-        toast(`整合包已装入服务器：${mods} 个模组${overrides ? ` / ${overrides} 个覆盖文件` : ''}，重启服务器后生效`, 'success')
-      } catch (e) {
-        const msg = errText(e)
-        toast(msg.includes('CDN') || msg.includes('超时') || msg.includes('网络') ? msg + '（可稍后重试或开启网络加速）' : '安装到服务器失败：' + msg, 'error')
-      }
-    })()
+    try {
+      const { added } = downloadQueue.enqueue({ file, kind: modal.kind, folder: '', serverId: modal.serverId })
+      modal.open = false; fileGeneration++; openGeneration++
+      toast(added ? '已加入社区下载队列，将安装到在线服务器' : '该整合包已在服务器下载队列中', 'info')
+    } catch (e) {
+      toast('加入队列失败：' + errText(e), 'error')
+    }
     return
   }
   const target = isModpack.value ? undefined : targetOptions.value.find(v => instanceKey(v) === modal.versionId)
