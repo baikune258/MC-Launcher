@@ -1,14 +1,24 @@
 const fs = require('node:fs')
 const path = require('node:path')
 const { execFileSync } = require('node:child_process')
-if (process.platform === 'linux') execFileSync(process.execPath, ['scripts/build-linux-native.cjs'], { stdio: 'inherit' })
+if (process.platform === 'linux') {
+  execFileSync(process.execPath, ['scripts/build-linux-native.cjs'], { stdio: 'inherit' })
+  // 交叉编译 Windows portable 启动反馈组件（NSIS 模板注入 StartupFeedback.exe）：
+  // Linux 上无 Windows csc，改用 mono mcs 生成 .NET 4.x WinForms 可执行文件。
+  fs.mkdirSync(path.resolve('out/main'), { recursive: true })
+  execFileSync('mcs', ['/nologo', '/target:winexe', '/platform:anycpu', '/optimize+',
+    '/r:System.Windows.Forms.dll', '/r:System.Drawing.dll',
+    `/out:${path.resolve('out/main/StartupFeedback.exe')}`,
+    `/resource:${path.resolve('src/renderer/src/assets/splash-face.png')},face.png`,
+    path.resolve('native/StartupFeedback.cs')], { stdio: 'inherit' })
+}
 if (process.platform === 'darwin') {
   fs.mkdirSync(path.resolve('out/main'), { recursive: true })
   const arch = process.arch === 'arm64' ? 'arm64' : 'x86_64'
   execFileSync('swiftc', ['-O', '-target', `${arch}-apple-macos13.0`, 'native/MacGameWindow.swift', '-o', 'out/main/MacGameWindow'], { stdio: 'inherit' })
 }
 if (process.platform === 'win32') {
-  for (const name of ['WindowMaterial', 'GameWindowFocus']) {
+  for (const name of ['WindowMaterial', 'GameWindowFocus', 'GameTitle']) {
   const output = path.resolve(`out/main/${name}.exe`)
   fs.mkdirSync(path.dirname(output), { recursive: true })
   const compiler = path.join(process.env.SystemRoot || 'C:/Windows', 'Microsoft.NET/Framework64/v4.0.30319/csc.exe')

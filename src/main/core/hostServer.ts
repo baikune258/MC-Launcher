@@ -1,4 +1,4 @@
-/** 在线服务器（自建常驻服）：下载原版服务端、后台常驻运行、状态探测与日志。 */
+/** 在线服务器（自建常驻服）：下载服务端（原版/模组）、后台常驻运行、状态探测与日志。 */
 import { app } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -7,11 +7,14 @@ import { randomUUID } from 'node:crypto'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { getVersionJson, fetchVersionManifest } from './versions'
 import { downloadAll, type DownloadTask } from './download'
+import { downloadFetch } from './downloadFetch'
 import { scanJava } from './java'
 import { pingServer } from './servers'
 import { logScope } from './launcherLog'
 
 const hostLog = logScope('host-server')
+
+export type HostServerType = 'datapack' | 'modded'
 
 export interface HostServerRecord {
   id: string
@@ -19,6 +22,8 @@ export interface HostServerRecord {
   mcVersion: string
   port: number
   ramMb: number
+  /** 服务器类型：数据包服务器 / 模组服务器 */
+  type: HostServerType
   /** 启动器启动时自动拉起（一直开） */
   autoResume: boolean
   /** 正版验证（online-mode），默认关闭便于离线加入 */
@@ -40,6 +45,7 @@ export interface HostServerStatus {
 export interface HostServerCreateInput {
   name: string
   mcVersion: string
+  type?: HostServerType
   port?: number
   ramMb?: number
   autoResume?: boolean
@@ -65,7 +71,9 @@ export function readHostServers(): HostServerRecord[] {
   try {
     const raw = JSON.parse(fs.readFileSync(storeFile(), 'utf-8'))
     if (!Array.isArray(raw)) return []
-    return raw.filter((r) => r && typeof r === 'object' && typeof r.id === 'string' && typeof r.mcVersion === 'string')
+    return raw
+      .filter((r) => r && typeof r === 'object' && typeof r.id === 'string' && typeof r.mcVersion === 'string')
+      .map((r) => ({ type: 'datapack', ...r } as HostServerRecord))
   } catch {
     return []
   }
@@ -142,6 +150,7 @@ export async function createHostServer(input: HostServerCreateInput): Promise<Ho
   if (/[\\/:*?"<>|]/.test(name)) throw new Error('服务器名称不能包含 \\ / : * ? " < > | 字符')
   const port = Math.max(1, Math.min(65535, Math.trunc(input.port ?? 25565)))
   if (port !== Math.trunc(input.port ?? 25565)) throw new Error('端口需为 1-65535 的整数')
+  const type = input.type === 'modded' ? 'modded' : 'datapack'
   const manifest = await fetchVersionManifest('official', false)
   const entry = manifest.find((v) => v.id === input.mcVersion && v.type === 'release')
   if (!entry) throw new Error('只能基于正式版（Release）创建服务器，请选择原版正式版本')
@@ -154,25 +163,47 @@ export async function createHostServer(input: HostServerCreateInput): Promise<Ho
     mcVersion: entry.id,
     port,
     ramMb: Math.max(512, Math.min(16384, Math.trunc(input.ramMb ?? 2048))),
+    type,
     autoResume: input.autoResume !== false,
     onlineMode: input.onlineMode === true,
     createdAt: Date.now(),
     jarReady: false
   }
-  // 下载服务端 jar
-  hostLog(`下载 ${entry.id} 服务端…`)
-  const vj = await getVersionJson(entry.id, path.join(dir, 'version.json'))
-  const server = (vj.downloads as { server?: { url?: string; sha1?: string; size?: number } } | undefined)?.server
-  if (!server?.url) throw new Error(`版本 ${entry.id} 未提供服务端下载`)
-  const tasks: DownloadTask[] = [
-    {
-      url: server.url,
-      dest: serverJar(id),
-      sha1: server.sha1,
-      size: server.size
+  // 下载服务端 jar：数据包服务器 = 原版服务端；模组服务器 = Fabric 服务端
+  hostLog.info(`下载 ${entry.id}${type === 'modded' ? '（Fabric 模组）' : ''}服务端…`)
+  if (type === 'modded') {
+    // Fabric Loader 版本列表：https://meta.fabricmc.net/v2/versions/loader/<mc>
+    const loaderRes = await downloadFetch(`https://meta.fabricmc.net/v2/versions/loader/${encodeURIComponent(entry.id)}`, { signal: AbortSignal.timeout(15000) })
+    if (!loaderRes.ok) throw new Error('获取 Fabric 加载器版本失败，请检查网络后重试')
+    const loaderList = (await loaderRes.json()) as Array<{ loader?: { version?: string } }>
+    if (!Array.isArray(loaderList) || !loaderList.length || !loaderList[0]?.loader?.version) {
+      throw new Error(`Minecraft ${entry.id} 暂不支持 Fabric 模组服务器`)
     }
-  ]
-  await downloadAll(tasks)
+    const loaderVersion = loaderList[0].loader.version
+    const serverUrl = `https://meta.fabricmc.net/v2/versions/loader/${encodeURIComponent(entry.id)}/${encodeURIComponent(loaderVersion)}/server/jar`
+    await downloadAll([
+      {
+        url: serverUrl,
+        urls: [serverUrl],
+        dest: serverJar(id)
+      }
+    ])
+    fs.mkdirSync(path.join(dir, 'mods'), { recursive: true })
+  } else {
+    const vj = await getVersionJson(entry.id, path.join(dir, 'version.json'))
+    const server = (vj.downloads as { server?: { url?: string; sha1?: string; size?: number } } | undefined)?.server
+    if (!server?.url) throw new Error(`版本 ${entry.id} 未提供服务端下载`)
+    const tasks: DownloadTask[] = [
+      {
+        url: server.url,
+        dest: serverJar(id),
+        sha1: server.sha1,
+        size: server.size
+      }
+    ]
+    await downloadAll(tasks)
+    fs.mkdirSync(path.join(dir, 'world', 'datapacks'), { recursive: true })
+  }
   // 基础配置：同意 EULA；离线服（online-mode 由用户控制）
   fs.writeFileSync(path.join(dir, 'eula.txt'), 'eula=true\n', 'utf-8')
   fs.writeFileSync(
@@ -190,8 +221,42 @@ export async function createHostServer(input: HostServerCreateInput): Promise<Ho
   )
   record.jarReady = true
   upsertRecord(record)
-  hostLog(`服务器「${name}」创建完成（${entry.id}，端口 ${port}）`)
+  hostLog.info(`服务器「${name}」创建完成（${entry.id}${type === 'modded' ? ' · Fabric 模组' : ' · 数据包'}，端口 ${port}）`)
   return record
+}
+
+/** 数据包服务器：弹窗选择数据包 zip，装入世界 datapacks 目录（需先创建过世界再重载生效）。 */
+export function uploadHostServerDatapack(id: string, sourcePath: string): string | null {
+  const record = findRecord(id)
+  if (!record) throw new Error('服务器不存在')
+  const src = String(sourcePath ?? '')
+  if (!src.trim()) return null
+  if (!fs.existsSync(src) || !fs.statSync(src).isFile()) throw new Error('数据包文件不存在')
+  const target = path.join(serverDir(id), 'world', 'datapacks')
+  fs.mkdirSync(target, { recursive: true })
+  const fileName = path.basename(src)
+  if (!/\.zip$/i.test(fileName)) throw new Error('数据包必须为 .zip 文件')
+  const dest = path.join(target, fileName)
+  fs.copyFileSync(src, dest)
+  hostLog.info(`数据包「${fileName}」已装入服务器「${record.name}」`)
+  return fileName
+}
+
+/** 模组服务器：弹窗选择模组 jar，装入 mods 目录。 */
+export function uploadHostServerMod(id: string, sourcePath: string): string | null {
+  const record = findRecord(id)
+  if (!record) throw new Error('服务器不存在')
+  const src = String(sourcePath ?? '')
+  if (!src.trim()) return null
+  if (!fs.existsSync(src) || !fs.statSync(src).isFile()) throw new Error('模组文件不存在')
+  const target = path.join(serverDir(id), 'mods')
+  fs.mkdirSync(target, { recursive: true })
+  const fileName = path.basename(src)
+  if (!/\.jar$/i.test(fileName)) throw new Error('模组必须为 .jar 文件')
+  const dest = path.join(target, fileName)
+  fs.copyFileSync(src, dest)
+  hostLog.info(`模组「${fileName}」已装入服务器「${record.name}」`)
+  return fileName
 }
 
 export async function startHostServer(id: string): Promise<HostServerStatus> {
@@ -202,7 +267,7 @@ export async function startHostServer(id: string): Promise<HostServerStatus> {
   const child = launchServerProcess(record)
   record.pid = child.pid
   upsertRecord(record)
-  hostLog(`服务器「${record.name}」已启动（PID ${child.pid}）`)
+  hostLog.info(`服务器「${record.name}」已启动（PID ${child.pid}）`)
   // 等待服务端就绪：最多 90 秒轮询 SLP
   const deadline = Date.now() + 90_000
   while (Date.now() < deadline) {
@@ -308,10 +373,10 @@ export function resumeHostServers(): void {
         const st = await hostServerStatus(record.id)
         if (!st.online && !processAlive(record.pid)) {
           await startHostServer(record.id)
-          hostLog(`已自动拉起服务器「${record.name}」`)
+          hostLog.info(`已自动拉起服务器「${record.name}」`)
         }
       } catch (error) {
-        hostLog(`自动拉起「${record.name}」失败：${String(error)}`)
+        hostLog.info(`自动拉起「${record.name}」失败：${String(error)}`)
       }
     }
   })()

@@ -9,7 +9,7 @@ import crypto from 'node:crypto'
 import { GameExitEvidence } from '../../shared/gameExit'
 import { createCommandWorld } from './commandWorld'
 import { autoMemoryMB } from '../../shared/memory'
-import { requestGameWindowClose, focusGameWindow, spawnGameProcess } from './gracefulClose'
+import { requestGameWindowClose, focusGameWindow, spawnGameProcess, applyGameWindowTitle, setGameProcessPriority } from './gracefulClose'
 import { logScope } from './launcherLog'
 
 const launchLog = logScope('launch')
@@ -766,6 +766,35 @@ async function launchOwned(
   const proc = await withDeadline(signal => spawnGameProcess(javaPath, args, { cwd: effectiveGameDir, signal }), 15000, '游戏进程创建超时，请检查 Java 与系统权限')
   gameSession.attach(token, proc)
   spawned = true
+  // 启动选项（新）：自定义游戏窗口标题 / 自定义信息 / 进程优先级（失败不影响游戏运行）
+  {
+    const titleTemplate = settings.gameWindowTitle ?? ''
+    const infoTemplate = settings.gameWindowInfo ?? ''
+    const placeholderVersion = instanceMcVersion || ''
+    const placeholderAccount = account.username || ''
+    const substitute = (template: string) => template
+      .replaceAll('{版本}', placeholderVersion)
+      .replaceAll('{账号}', placeholderAccount)
+      .replaceAll('{目录}', path.basename(effectiveGameDir))
+    const customTitle = substitute(titleTemplate).trim()
+    const customInfo = substitute(infoTemplate).trim()
+    if (process.platform === 'win32' && (customTitle || customInfo)) {
+      const finalTitle = customTitle
+        ? (customInfo ? `${customTitle} | ${customInfo}` : customTitle)
+        : (customInfo ? `Minecraft ${placeholderVersion} | ${customInfo}` : '')
+      if (finalTitle) {
+        void applyGameWindowTitle(proc, finalTitle).then(
+          () => log(`[MC-Launcher] 游戏窗口标题已设为：${finalTitle}`),
+          error => log(`[MC-Launcher] 设置游戏窗口标题未完成：${error.message}`)
+        )
+      }
+    }
+    if (process.platform === 'win32' && settings.processPriority && settings.processPriority !== 'normal') {
+      void setGameProcessPriority(proc, settings.processPriority).then(
+        () => log(`[MC-Launcher] 已设置游戏进程优先级：${settings.processPriority}`)
+      )
+    }
+  }
   const spawnedAt = Date.now()
   const capturedFolder = folderOfVersion(versionId)
   const initialWindowPreference = structuredClone(instanceConfig._resolution ?? settings.resolution)

@@ -10,18 +10,21 @@ import {
   stopHostServer,
   hostServerStatus,
   deleteHostServer,
+  uploadHostServerDatapack,
+  uploadHostServerMod,
   getManifest
 } from '../api'
 import { toast } from '../store'
-import type { HostServerRecord, HostServerStatus, HostServerCreateInput, RemoteVersion } from '@shared/types'
+import type { HostServerRecord, HostServerStatus, HostServerCreateInput, HostServerType, RemoteVersion } from '@shared/types'
 
 const hostServers = ref<HostServerRecord[]>([])
 const hostStatus = reactive<Record<string, HostServerStatus>>({})
 const hostBusy = ref('')
-const hostCreate = reactive({ open: false, busy: false, error: '', name: '', mcVersion: '', port: 25565, ramMb: 2048, autoResume: true, onlineMode: false })
+const hostCreate = reactive({ open: false, busy: false, error: '', name: '', mcVersion: '', type: 'datapack' as HostServerType, port: 25565, ramMb: 2048, autoResume: true, onlineMode: false })
 const hostVersions = ref<RemoteVersion[]>([])
 const hostLogOpen = ref<Record<string, boolean>>({})
 const hostLoaded = ref(false)
+const hostUploadBusy = ref('')
 let pollTimer: ReturnType<typeof setInterval> | undefined
 
 async function loadHostServers() {
@@ -51,6 +54,7 @@ async function onHostCreate() {
     const input: HostServerCreateInput = {
       name: hostCreate.name,
       mcVersion: hostCreate.mcVersion,
+      type: hostCreate.type,
       port: hostCreate.port,
       ramMb: hostCreate.ramMb,
       autoResume: hostCreate.autoResume,
@@ -110,6 +114,33 @@ async function copyHostAddress(id: string) {
   try { toast(await copyText(st.address) ? '地址已复制，发给好友即可加入（同一网络）' : '复制失败', 'info') }
   catch (e) { toast('复制失败：' + errText(e), 'error') }
 }
+async function onHostUploadDatapack(id: string) {
+  hostUploadBusy.value = id
+  try {
+    const name = await uploadHostServerDatapack(id)
+    if (name) toast(`数据包「${name}」已装入，新世界会自动加载；已生成的世界请先备份存档再使用 /reload 或重启服务器生效`, 'success')
+  } catch (e) {
+    toast('上传数据包失败：' + errText(e), 'error')
+  } finally {
+    hostUploadBusy.value = ''
+  }
+}
+async function onHostUploadMod(id: string) {
+  hostUploadBusy.value = id
+  try {
+    const name = await uploadHostServerMod(id)
+    if (name) toast(`模组「${name}」已装入，重启服务器后生效`, 'success')
+  } catch (e) {
+    toast('上传模组失败：' + errText(e), 'error')
+  } finally {
+    hostUploadBusy.value = ''
+  }
+}
+const hostTypeText = (s: HostServerRecord) => (s.type === 'modded' ? '模组服务器 · Fabric' : '数据包服务器 · 原版')
+const hostTypeHint = (s: HostServerRecord) =>
+  s.type === 'modded'
+    ? '模组装入 mods 目录，重启服务器生效；数据包服务器需要把数据包放进世界 datapacks 目录'
+    : '数据包装入世界 datapacks 目录，新世界自动加载'
 const hostStateText = (s: HostServerRecord) => {
   const st = hostStatus[s.id]
   if (st?.online) return '在线'
@@ -137,13 +168,13 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
       <div><h1>在线服务器 <small>{{ hostServers.length }} 个 · {{ onlineCount }} 个在线</small></h1></div>
       <button class="btn btn-gold" @click="openHostCreate()"><span aria-hidden="true">＋</span> 创建服务器</button>
     </header>
-    <p class="connection-muted host-intro">自建原版常驻服务器：后台一直运行（关闭启动器也不停），地址发给好友即可加入。</p>
+    <p class="connection-muted host-intro">自建常驻服务器：数据包服务器（原版）或模组服务器（Fabric），后台一直运行（关闭启动器也不停），地址发给好友即可加入。</p>
 
     <div v-if="!hostLoaded" class="connection-panel host-empty">正在读取服务器…</div>
     <div v-else-if="!hostServers.length" class="connection-panel host-empty host-empty-card">
       <span class="connection-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="20" height="8" rx="2"/><rect x="2" y="12" width="20" height="8" rx="2"/><path d="M6 8h.01M6 16h.01M14 8h4M14 16h4"/></svg></span>
       <h3>开一个一直在线等好友的服务器</h3>
-      <p>选择正式版版本，自动下载原版服务端；启动后后台常驻，即使关闭启动器也继续运行。</p>
+      <p>选择正式版版本，自动下载服务端（数据包服务器为原版、模组服务器为 Fabric）；启动后后台常驻，即使关闭启动器也继续运行。</p>
       <button class="btn btn-gold" @click="openHostCreate()">创建第一个服务器</button>
     </div>
     <div v-else class="host-server-list">
@@ -151,10 +182,12 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
         <div class="host-card-main">
           <span class="host-state" :class="hostStateClass(s)"><i aria-hidden="true"></i>{{ hostStateText(s) }}</span>
           <div class="host-card-info">
-            <strong>{{ s.name }}</strong>
+            <strong>{{ s.name }} <span class="host-type-tag">{{ hostTypeText(s) }}</span></strong>
             <span class="muted host-meta">{{ s.mcVersion }} · 端口 {{ s.port }} · {{ s.ramMb }}M · {{ s.autoResume ? '自动拉起' : '手动启动' }}</span>
           </div>
           <div class="host-card-actions">
+            <button v-if="s.type === 'datapack'" class="btn btn-ghost btn-sm" :disabled="hostUploadBusy === s.id" @click="onHostUploadDatapack(s.id)">上传数据包</button>
+            <button v-else class="btn btn-ghost btn-sm" :disabled="hostUploadBusy === s.id" @click="onHostUploadMod(s.id)">上传模组</button>
             <button class="btn btn-ghost btn-sm" :disabled="hostBusy === s.id" @click="copyHostAddress(s.id)">复制地址</button>
             <button v-if="!hostStatus[s.id]?.running" class="btn btn-gold btn-sm" :disabled="hostBusy === s.id" @click="onHostStart(s.id)">启动</button>
             <button v-else class="btn btn-danger btn-sm" :disabled="hostBusy === s.id" @click="onHostStop(s.id)">停止</button>
@@ -162,8 +195,9 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
             <button class="btn btn-ghost btn-sm host-del" @click="onHostDelete(s.id)">删除</button>
           </div>
         </div>
-        <p v-if="hostStatus[s.id]?.address" class="host-address">加入地址：<code>{{ hostStatus[s.id]?.address }}</code><span class="muted">（同一网络的好友可加入；公网联机可在「联机」页配置樱花穿透）</span></p>
+        <div v-if="hostStatus[s.id]?.address" class="host-address">加入地址：<code>{{ hostStatus[s.id]?.address }}</code><span class="muted">（同一网络的好友可加入；公网联机可在「联机」页配置樱花穿透）</span></div>
         <p v-if="hostStatus[s.id]?.online && hostStatus[s.id]?.players" class="host-players muted">当前在线 {{ hostStatus[s.id]?.players }} 人</p>
+        <p class="muted host-type-hint">{{ hostTypeHint(s) }}</p>
         <pre v-if="hostLogOpen[s.id]" class="host-log">{{ hostStatus[s.id]?.logTail || '暂无日志' }}</pre>
       </div>
     </div>
@@ -171,9 +205,22 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
     <Teleport to="body">
       <div v-if="hostCreate.open" class="modal-mask connection-modal" @pointerdown.self="!hostCreate.busy && (hostCreate.open = false)">
         <div class="modal" role="dialog" aria-modal="true" aria-label="创建在线服务器">
-          <h3 class="modal-title">创建在线服务器</h3><p class="connection-muted">下载原版服务端并后台常驻运行，关闭启动器也不会停；地址发给好友即可加入。</p><p v-if="hostCreate.error" class="connection-error" role="alert">{{ hostCreate.error }}</p>
+          <h3 class="modal-title">创建在线服务器</h3><p class="connection-muted">自动下载服务端并后台常驻运行，关闭启动器也不会停；地址发给好友即可加入。</p><p v-if="hostCreate.error" class="connection-error" role="alert">{{ hostCreate.error }}</p>
           <label for="host-server-name" class="modal-label">服务器名称</label>
           <input id="host-server-name" v-model="hostCreate.name" class="input" placeholder="例如：我的生存服" maxlength="40" />
+          <label class="modal-label">服务器类型</label>
+          <div class="host-type-picker">
+            <label class="host-type-option" :class="{ 'host-type-active': hostCreate.type === 'datapack' }">
+              <input type="radio" value="datapack" v-model="hostCreate.type" />
+              <span class="host-type-name">数据包服务器</span>
+              <span class="muted host-type-desc">原版服务端，可装入数据包（.zip）</span>
+            </label>
+            <label class="host-type-option" :class="{ 'host-type-active': hostCreate.type === 'modded' }">
+              <input type="radio" value="modded" v-model="hostCreate.type" />
+              <span class="host-type-name">模组服务器</span>
+              <span class="muted host-type-desc">Fabric 服务端，可装入模组（.jar）</span>
+            </label>
+          </div>
           <label for="host-server-version" class="modal-label">游戏版本（正式版）</label>
           <select id="host-server-version" v-model="hostCreate.mcVersion" class="select">
             <option v-for="v in hostVersions" :key="v.id" :value="v.id">{{ v.id }}</option>
@@ -223,6 +270,14 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
 .host-players { margin:4px 0 0; font-size:12px; }
 .host-log { margin:10px 0 0; max-height:200px; overflow:auto; padding:10px; border-radius:8px; background:var(--bg-2, #00000066); font-size:12px; line-height:1.6; white-space:pre-wrap; word-break:break-all; }
 .host-form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.host-type-picker { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.host-type-option { display:flex; flex-direction:column; gap:4px; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius-md); cursor:pointer; transition:border-color .15s, background .15s; }
+.host-type-option input { position:absolute; opacity:0; pointer-events:none; }
+.host-type-option.host-type-active { border-color:var(--accent); background:var(--hover); }
+.host-type-name { font-size:14px; font-weight:700; }
+.host-type-desc { font-size:12px; line-height:1.5; }
+.host-type-tag { font-size:11px; font-weight:400; color:var(--accent); border:1px solid var(--border); border-radius:999px; padding:1px 8px; margin-left:6px; vertical-align:2px; }
+.host-type-hint { margin:6px 0 0; font-size:12px; }
 .modal-check { display:flex; align-items:center; gap:8px; margin:10px 0 0; font-size:13px; color:var(--text-dim); cursor:pointer; }
 .modal-check input { width:16px; height:16px; accent-color:var(--accent); }
 </style>

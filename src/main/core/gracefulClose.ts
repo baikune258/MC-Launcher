@@ -433,3 +433,50 @@ export async function spawnDetachedProcess(exePath: string, args: string[], opti
   child.unref()
   return child.pid ?? null
 }
+
+/**
+ * 自定义游戏窗口标题（Windows）：调用 GameTitle.exe 等待游戏窗口出现并改写标题。
+ * 非 Windows 或设置为空时直接成功返回，不影响启动流程。
+ */
+export function applyGameWindowTitle(child: GameProcessHandle, title: string, timeoutMs = 30000): Promise<void> {
+  const pid = child.pid
+  if (process.platform !== 'win32' || !Number.isSafeInteger(pid) || !pid || child.exitCode !== null || child.signalCode !== null || !title.trim()) {
+    return Promise.resolve()
+  }
+  closeLog.debug(`改写游戏窗口标题：pid=${pid} title="${title}"`)
+  const helper = join(__dirname, 'GameTitle.exe').replace('app.asar', 'app.asar.unpacked')
+  return new Promise((resolve, reject) => {
+    const worker = execFile(helper, [String(pid), String(timeoutMs), title], { windowsHide: true, timeout: timeoutMs + 2000 }, (error, _stdout, stderr) => {
+      child.off('exit', cancel)
+      if (child.exitCode !== null || child.signalCode !== null) return resolve()
+      if (error) {
+        closeLog.warn(`游戏窗口标题改写未完成：pid=${pid}`, error)
+        reject(new Error(stderr.trim() || '游戏窗口标题改写失败或超时'))
+      } else resolve()
+    })
+    const cancel = () => { worker.kill() } // Only our helper, never the game.
+    child.once('exit', cancel)
+  })
+}
+
+const PRIORITY_MAP: Record<string, string> = {
+  low: 'Idle',
+  normal: 'Normal',
+  high: 'High',
+  realtime: 'Realtime'
+}
+
+/** 设置游戏进程优先级（Windows 有效）；其他平台或 normal 直接返回。 */
+export function setGameProcessPriority(child: GameProcessHandle, priority: string): Promise<void> {
+  const pid = child.pid
+  if (process.platform !== 'win32' || !Number.isSafeInteger(pid) || !pid || child.exitCode !== null || child.signalCode !== null) {
+    return Promise.resolve()
+  }
+  const cls = PRIORITY_MAP[priority]
+  if (!cls || cls === 'Normal') return Promise.resolve()
+  closeLog.info(`设置游戏进程优先级：pid=${pid} → ${cls}`)
+  const script = `$ErrorActionPreference='SilentlyContinue'; (Get-Process -Id ${pid} -ErrorAction SilentlyContinue).PriorityClass = '${cls}'`
+  return new Promise((resolve) => {
+    execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', script], { windowsHide: true, timeout: 8000 }, () => resolve())
+  })
+}

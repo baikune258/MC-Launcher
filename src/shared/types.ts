@@ -396,6 +396,14 @@ export interface Settings {
   resolution: GameResolution
   /** Windows: remember the last observed normal game client size on clean exit; default off. */
   rememberGameWindowSize?: boolean
+  /** 游戏窗口标题模板（空 = 默认标题）；支持 {版本} {账号} {目录} 占位符 */
+  gameWindowTitle?: string
+  /** 自定义信息：非空时追加到游戏窗口标题末尾（支持 {版本} {账号} 占位符） */
+  gameWindowInfo?: string
+  /** 启动游戏时启动器窗口行为：keep=保持显示 minimize=最小化 hide=隐藏 */
+  launcherVisibility?: 'keep' | 'minimize' | 'hide'
+  /** 游戏进程优先级：low=低 normal=正常 high=高 realtime=实时（仅 Windows 生效） */
+  processPriority?: 'low' | 'normal' | 'high' | 'realtime'
   mirror: 'official' | 'bmclapi'
   /** 跨所有任务的 HTTP 并发上限。 */
   downloadThreads: number
@@ -740,6 +748,8 @@ export const IPC = {
   hostServerLog: 'host-server:log', // (id) => string
   hostServerDelete: 'host-server:delete', // (id) => void
   hostServerResume: 'host-server:resume', // () => void
+  hostServerUploadDatapack: 'host-server:uploadDatapack', // (id) => string | null  弹窗选 zip 数据包并装入世界目录
+  hostServerUploadMod: 'host-server:uploadMod', // (id) => string | null  弹窗选 jar 模组并装入 mods 目录
   appSelectDir: 'app:selectDir', // () => string | null
   appSelectFile: 'app:selectFile', // () => string | null  选择整合包文件（.mrpack/.zip）
   // 插件系统（userData/plugins/<id>/{plugin.json,main.js}，JS 插件在页面上下文执行）
@@ -1365,12 +1375,17 @@ export interface ServerPingResult {
 }
 
 /** 在线服务器（自建常驻服）记录 */
+/** 在线服务器类型：datapack=数据包服务器（原版服务端+数据包） modded=模组服务器（Fabric 服务端+模组） */
+export type HostServerType = 'datapack' | 'modded'
+
 export interface HostServerRecord {
   id: string
   name: string
   mcVersion: string
   port: number
   ramMb: number
+  /** 服务器类型：数据包服务器 / 模组服务器 */
+  type: HostServerType
   /** 启动器启动时自动拉起（一直开） */
   autoResume: boolean
   /** 正版验证（online-mode），默认关闭便于离线加入 */
@@ -1394,6 +1409,7 @@ export interface HostServerStatus {
 export interface HostServerCreateInput {
   name: string
   mcVersion: string
+  type?: HostServerType
   port?: number
   ramMb?: number
   autoResume?: boolean

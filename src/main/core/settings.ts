@@ -52,6 +52,10 @@ function defaults(): Settings {
     jvmArgs: '',
     resolution: { width: 854, height: 480, mode: 'windowed', fullscreen: false },
     rememberGameWindowSize: false,
+    gameWindowTitle: '',
+    gameWindowInfo: '',
+    launcherVisibility: 'keep',
+    processPriority: 'normal',
     mirror: 'bmclapi',
     ...DEFAULT_DOWNLOAD_LIMITS,
     defaultIsolation: true,
@@ -145,6 +149,10 @@ export function getSettings(): Settings {
       uiWindowAutoFit: raw.uiWindowAutoFit === true,
       updateMirrorUrls: storedUpdateMirrorUrls(raw.updateMirrorUrls),
       rememberGameWindowSize: raw.rememberGameWindowSize === true,
+      gameWindowTitle: typeof raw.gameWindowTitle === 'string' ? raw.gameWindowTitle : def.gameWindowTitle,
+      gameWindowInfo: typeof raw.gameWindowInfo === 'string' ? raw.gameWindowInfo : def.gameWindowInfo,
+      launcherVisibility: ['keep', 'minimize', 'hide'].includes(String(raw.launcherVisibility)) ? raw.launcherVisibility : def.launcherVisibility,
+      processPriority: ['low', 'normal', 'high', 'realtime'].includes(String(raw.processPriority)) ? raw.processPriority : def.processPriority,
       ...normalizeVersionCategoryState(raw),
       visualDesign: cleanDesign(raw.visualDesign),
       resolution: { ...def.resolution, ...(raw.resolution ?? {}) },
@@ -225,6 +233,10 @@ export function getSettings(): Settings {
 export function saveSettings(patch: Partial<Settings>): Settings {
   if (Object.prototype.hasOwnProperty.call(patch, 'updateMirrorUrls')) patch = { ...patch, updateMirrorUrls: validateUpdateMirrorUrls(patch.updateMirrorUrls) }
   if (Object.prototype.hasOwnProperty.call(patch, 'rememberGameWindowSize') && typeof patch.rememberGameWindowSize !== 'boolean') throw new Error('保存游戏窗口大小必须为开启或关闭')
+  if (Object.prototype.hasOwnProperty.call(patch, 'gameWindowTitle') && typeof patch.gameWindowTitle !== 'string') throw new Error('游戏窗口标题必须为文本')
+  if (Object.prototype.hasOwnProperty.call(patch, 'gameWindowInfo') && typeof patch.gameWindowInfo !== 'string') throw new Error('自定义信息必须为文本')
+  if (Object.prototype.hasOwnProperty.call(patch, 'launcherVisibility') && !['keep', 'minimize', 'hide'].includes(String(patch.launcherVisibility))) throw new Error('启动器可见性取值非法')
+  if (Object.prototype.hasOwnProperty.call(patch, 'processPriority') && !['low', 'normal', 'high', 'realtime'].includes(String(patch.processPriority))) throw new Error('进程优先级取值非法')
   if (Object.prototype.hasOwnProperty.call(patch, 'uiWindowAutoFit') && typeof patch.uiWindowAutoFit !== 'boolean') throw new Error('UI窗口自适应必须为开启或关闭')
   const cur = getSettings()
   validateDownloadLimits({ ...cur, ...patch })

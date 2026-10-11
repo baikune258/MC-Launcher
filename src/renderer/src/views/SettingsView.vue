@@ -991,6 +991,47 @@ async function onRemovePlugin(p: PluginInfo) {
           <p data-ui="SettingsView:d70854df0dee" v-if="!canRememberWindow" class="muted group-hint">当前仅支持 Windows 游戏窗口。</p>
         </div>
 
+        <div class="card group" data-section="launch-options">
+          <h3 class="group-title">游戏启动选项</h3>
+          <div class="launch-option-row">
+            <div class="launch-option-field">
+              <label for="launch-opt-title" class="modal-label">游戏窗口标题</label>
+              <input id="launch-opt-title" class="input" type="text" maxlength="64"
+                :value="store.settings?.gameWindowTitle ?? ''"
+                placeholder="留空使用默认标题"
+                @change="save({ gameWindowTitle: ($event.target as HTMLInputElement).value })" />
+            </div>
+            <div class="launch-option-field">
+              <label for="launch-opt-info" class="modal-label">自定义信息</label>
+              <input id="launch-opt-info" class="input" type="text" maxlength="64"
+                :value="store.settings?.gameWindowInfo ?? ''"
+                placeholder="追加到窗口标题末尾（可留空）"
+                @change="save({ gameWindowInfo: ($event.target as HTMLInputElement).value })" />
+            </div>
+          </div>
+          <p class="muted group-hint">支持占位符：<code>{版本}</code> <code>{账号}</code> <code>{目录}</code>（自定义信息仅支持 <code>{版本}</code> <code>{账号}</code>）。游戏窗口出现后自动应用，仅 Windows 生效。</p>
+          <div class="launch-option-row">
+            <div class="launch-option-field">
+              <label for="launch-opt-vis" class="modal-label">启动器可见性</label>
+              <select id="launch-opt-vis" class="select" :value="store.settings?.launcherVisibility ?? 'keep'" @change="save({ launcherVisibility: ($event.target as HTMLSelectElement).value as Settings['launcherVisibility'] })">
+                <option value="keep">保持显示</option>
+                <option value="minimize">最小化</option>
+                <option value="hide">隐藏</option>
+              </select>
+            </div>
+            <div class="launch-option-field">
+              <label for="launch-opt-prio" class="modal-label">进程优先级</label>
+              <select id="launch-opt-prio" class="select" :value="store.settings?.processPriority ?? 'normal'" @change="save({ processPriority: ($event.target as HTMLSelectElement).value as Settings['processPriority'] })">
+                <option value="low">低</option>
+                <option value="normal">正常</option>
+                <option value="high">高</option>
+                <option value="realtime">实时</option>
+              </select>
+            </div>
+          </div>
+          <p class="muted group-hint">游戏启动后最小化或隐藏启动器；游戏退出时自动恢复显示（隐藏时）。进程优先级仅 Windows 生效。</p>
+        </div>
+
       </div>
 
       <!-- 正版代理 + 启动后关闭：同一行横向排布 -->
@@ -1716,5 +1757,20 @@ async function onRemovePlugin(p: PluginInfo) {
  .settings-page{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto auto auto minmax(0,1fr)}
  .settings-search{grid-row:2;grid-column:1}.settings-scopes{grid-row:3}.settings-categories{grid-row:4}.settings-body{grid-row:5}.settings-search-results{top:92px}
  .feature-grid{grid-template-columns:minmax(0,1fr)}.theme-options{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+.launch-option-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-3);
+}
+.launch-option-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.launch-option-field .select,
+.launch-option-field .input {
+  width: 100%;
 }
 </style>

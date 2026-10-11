@@ -104,7 +104,7 @@ import { registerVoxlinkIpc } from './core/voxlink'
 import { registerTerracottaIpc } from './core/terracotta'
 import { registerFrpIpc, installFrpEventBridge } from './core/frpIpc'
 import { registerHostServerIpc } from './core/hostServerIpc'
-import { resumeHostServers } from './core/hostServer'
+import { resumeHostServers, uploadHostServerDatapack, uploadHostServerMod } from './core/hostServer'
 
 function errText(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
@@ -151,6 +151,19 @@ export function registerIpc(getWin: () => BrowserWindow | null): void {
   registerFrpIpc(ipcMain)
   installFrpEventBridge(getWin)
   registerHostServerIpc(ipcMain)
+  // 在线服务器：上传数据包 / 上传模组（弹窗选文件后装入对应目录）
+  ipcMain.handle(IPC.hostServerUploadDatapack, async (_e, id: string) => {
+    const opts = { title: '选择数据包（.zip）', filters: [{ name: 'Minecraft 数据包', extensions: ['zip'] }], properties: ['openFile' as const] }
+    const r = getWin() ? await dialog.showOpenDialog(getWin()!, opts) : await dialog.showOpenDialog(opts)
+    if (r.canceled || !r.filePaths[0]) return null
+    return uploadHostServerDatapack(String(id ?? ''), r.filePaths[0])
+  })
+  ipcMain.handle(IPC.hostServerUploadMod, async (_e, id: string) => {
+    const opts = { title: '选择模组（.jar）', filters: [{ name: 'Minecraft 模组', extensions: ['jar'] }], properties: ['openFile' as const] }
+    const r = getWin() ? await dialog.showOpenDialog(getWin()!, opts) : await dialog.showOpenDialog(opts)
+    if (r.canceled || !r.filePaths[0]) return null
+    return uploadHostServerMod(String(id ?? ''), r.filePaths[0])
+  })
   const send = (channel: string, payload: unknown): void => {
     const window = getWin()
     if (window && !window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send(channel, payload)
@@ -736,6 +749,7 @@ export function registerIpc(getWin: () => BrowserWindow | null): void {
     if (!versions.scanInstalledFolder(folder).versions.some(v => v.id === versionId && !v.failed && !v.incomplete)) throw new Error('目标实例不存在或不完整，请刷新版本列表')
     launcherLogInfo('game', `收到启动请求：version=${String(versionId ?? '')}`)
     const launchId = crypto.randomUUID()
+    let launcherHidden = false
     sendState({ status: 'launching', text: '正在准备启动…', versionId, folder, launchId })
     void withGameFolder(folder, () => launch
       .launch(
@@ -751,9 +765,27 @@ export function registerIpc(getWin: () => BrowserWindow | null): void {
             else launcherLogWarn('game', `游戏异常退出（code=${code}）：${s.text}`)
           } else launcherLogInfo('game', `启动状态 ${s.status}：${s.text}`)
           sendState({ ...s, versionId, folder, launchId })
-          // 设置项生效：游戏成功进入运行状态后关闭启动器窗口
-          if (s.status === 'running' && settings.getSettings().closeAfterLaunch) {
-            setTimeout(() => getWin()?.close(), 1500)
+          // 设置项生效：游戏成功进入运行状态后关闭/最小化/隐藏启动器窗口
+          if (s.status === 'running') {
+            const vis = settings.getSettings().launcherVisibility ?? 'keep'
+            const mainWin = getWin()
+            if (mainWin && !mainWin.isDestroyed()) {
+              if (vis === 'minimize') mainWin.minimize()
+              else if (vis === 'hide') { mainWin.hide(); launcherHidden = true }
+            }
+            if (settings.getSettings().closeAfterLaunch) {
+              setTimeout(() => getWin()?.close(), 1500)
+            }
+          }
+          // 游戏退出后恢复被隐藏的启动器窗口（仅本次启动因 hide 隐藏时恢复）
+          if (s.status === 'exited' || s.status === 'error') {
+            if (launcherHidden) {
+              launcherHidden = false
+              const mainWin = getWin()
+              if (mainWin && !mainWin.isDestroyed() && !mainWin.isVisible()) {
+                try { mainWin.show() } catch { /* 窗口销毁时忽略 */ }
+              }
+            }
           }
         },
         serverAddress ? String(serverAddress) : undefined,
