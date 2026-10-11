@@ -8,6 +8,7 @@ export interface UpdateNote {
 
 /** 按版本倒序；latest 为当前版本 */
 export const updateNotes: UpdateNote[] = [
+  {"version":"1.1.45","date":"2026-10-12 10:30","changes":["修复了一些BUG或问题"]},
   {"version":"1.1.44","date":"2026-10-12 09:00","changes":["修复了一些BUG或问题"]},
   {"version":"1.1.43","date":"2026-10-11 21:30","changes":["新增：在线服务器支持数据包服务器（原版，可装入 .zip 数据包）与模组服务器（Fabric，可装入 .jar 模组）","新增：游戏启动选项——自定义游戏窗口标题与自定义信息、启动器可见性（保持/最小化/隐藏）、进程优先级（低/正常/高/实时）"]},
   {"version":"1.1.42","date":"2026-10-11 20:00","changes":["修复了一些BUG或问题"]},

@@ -182,11 +182,22 @@ export async function createHostServer(input: HostServerCreateInput, onProgress?
     const loaderRes = await downloadFetch(`https://meta.fabricmc.net/v2/versions/loader/${encodeURIComponent(entry.id)}`, { signal: AbortSignal.timeout(15000) })
     if (!loaderRes.ok) throw new Error('获取 Fabric 加载器版本失败，请检查网络后重试')
     const loaderList = (await loaderRes.json()) as Array<{ loader?: { version?: string } }>
-    if (!Array.isArray(loaderList) || !loaderList.length || !loaderList[0]?.loader?.version) {
+    if (!Array.isArray(loaderList) || !loaderList.length) {
       throw new Error(`Minecraft ${entry.id} 暂不支持 Fabric 模组服务器`)
     }
-    const loaderVersion = loaderList[0].loader.version
-    const serverUrl = `https://meta.fabricmc.net/v2/versions/loader/${encodeURIComponent(entry.id)}/${encodeURIComponent(loaderVersion)}/server/jar`
+    // 列表首项不一定可用（个别 Loader 与该版本组合 404），依次探测前几个 Loader 的 server/jar
+    let serverUrl: string | null = null
+    for (const item of loaderList.slice(0, 5)) {
+      const lv = item?.loader?.version
+      if (!lv) continue
+      const candidate = `https://meta.fabricmc.net/v2/versions/loader/${encodeURIComponent(entry.id)}/${encodeURIComponent(lv)}/server/jar`
+      try {
+        const probe = await downloadFetch(candidate, { method: 'HEAD', signal: AbortSignal.timeout(10000) })
+        if (probe.ok) { serverUrl = candidate; break }
+        await probe.body?.cancel()
+      } catch { /* 单次探测失败继续尝试下一个 */ }
+    }
+    if (!serverUrl) throw new Error(`Minecraft ${entry.id} 暂不支持 Fabric 模组服务器（未找到可用 Loader）`)
     onProgress?.('下载 Fabric 服务端', 5)
     await downloadAll([
       {
