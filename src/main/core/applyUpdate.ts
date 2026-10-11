@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import { randomUUID } from 'node:crypto'
-import { atomicUpdateJson, buildUpdaterScript, readUpdateTransaction, updateMarker, validateUpdatePayload, type UpdateTransaction, type UpdaterScriptSpec } from './updateTransaction'
+import { atomicUpdateJson, buildUpdaterScript, readUpdateTransaction, updateMarker, migrateUpdateMarkers, validateUpdatePayload, type UpdateTransaction, type UpdaterScriptSpec } from './updateTransaction'
 export { buildUpdaterScript } from './updateTransaction'
 import { app } from 'electron'
 import type { LocalUpdateCheck, ProgressEvent, ReleaseInfo, UpdateStateInfo } from '../../shared/types'
@@ -53,10 +53,10 @@ export function updateSupported(): boolean {
 function updateDirOf(exe: string): string {
   if (process.platform === 'darwin') return macUpdateDir()
   if (process.platform === 'linux') return linuxUpdateDir()
-  return path.join(path.dirname(exe), 'KAMUCL-update')
+  return path.join(path.dirname(exe), 'MC-Launcher-update')
 }
 function backupDirOf(exe: string): string {
-  return path.join(path.dirname(exe), 'KAMUCL-backup')
+  return path.join(path.dirname(exe), 'MC-Launcher-backup')
 }
 
 function userDataDir(): string {
@@ -127,9 +127,9 @@ async function writePendingUpdate(release: ReleaseInfo, file: string, sha256: st
 
 /**
  * 清理更新遗留物（仅在启动时执行一次，不阻断启动）：
- * - EXE 旁的 .kamuclupdate* 残留标记（.completed / .receipt.json / .failed / .applying.failed / 无事务的 marker）
- * - KAMUCL-update 中的残留下载包及空目录
- * - KAMUCL-backup 只保留 update-state.json 指向的最新备份（回退功能仍可用），其余旧备份删除
+ * - EXE 旁的 .mclauncherupdate* 残留标记；并兼容清理旧命名 .kamuclupdate*
+ * - MC-Launcher-update 中的残留下载包及空目录；旧命名 KAMUCL-update 一并清理
+ * - MC-Launcher-backup 只保留 update-state.json 指向的最新备份（回退功能仍可用），其余旧备份删除；旧命名 KAMUCL-backup 全量迁移到新名后清理
  * 调用时机：applyUpdateOnStartup 之后（此时活动事务已被消费或不存在），下载中不会发生。
  */
 export function cleanupUpdateRemnants(): void {
@@ -137,19 +137,29 @@ export function cleanupUpdateRemnants(): void {
   const exe = currentPortableExe()
   if (!exe) return
   const base = path.dirname(exe)
-  // 1. 更新标记残留
+  // 1. 更新标记残留（新旧两套命名都清）
   try {
     for (const name of fs.readdirSync(base)) {
-      if (name.startsWith('.kamuclupdate')) {
+      if (name.startsWith('.mclauncherupdate') || name.startsWith('.kamuclupdate')) {
         try { fs.rmSync(path.join(base, name), { force: true }) } catch { /* 占用时留待下次 */ }
       }
     }
   } catch { /* 目录不可读则跳过 */ }
-  // 2. KAMUCL-update 残留下载包与空目录
+  // 2. MC-Launcher-update 残留下载包与空目录（含旧命名 KAMUCL-update）
+  try { fs.rmSync(path.join(base, 'MC-Launcher-update'), { recursive: true, force: true }) } catch { /* 跳过 */ }
   try { fs.rmSync(path.join(base, 'KAMUCL-update'), { recursive: true, force: true }) } catch { /* 跳过 */ }
-  // 3. KAMUCL-backup：只保留最新备份（回退依赖），其余旧备份删除
+  // 3. 旧命名 KAMUCL-backup 迁移到 MC-Launcher-backup（只保留可回退的最新备份）
   try {
-    const backupDir = path.join(base, 'KAMUCL-backup')
+    const legacyBackup = path.join(base, 'KAMUCL-backup')
+    const newBackup = backupDirOf(exe)
+    if (fs.existsSync(legacyBackup) && !fs.existsSync(newBackup)) {
+      fs.renameSync(legacyBackup, newBackup)
+      try { fs.rmdirSync(legacyBackup) } catch { /* 已不存在 */ }
+    }
+  } catch { /* 迁移失败跳过 */ }
+  // 4. MC-Launcher-backup：只保留最新备份（回退依赖），其余旧备份删除
+  try {
+    const backupDir = backupDirOf(exe)
     if (!fs.existsSync(backupDir)) return
     const state = getUpdateState()
     let keep = state ? path.basename(state.backupPath) : null
@@ -184,6 +194,7 @@ export async function applyUpdateOnStartup(): Promise<boolean> {
   if (process.platform === 'linux') return applyLinuxUpdateOnStartup()
   const exe = currentPortableExe()
   if (!exe) return false
+  migrateUpdateMarkers(exe)
   const marker = updateMarker(exe), claim = marker + '.applying'
   if (fs.existsSync(claim)) {
     const previous = readUpdateTransaction(claim, exe)

@@ -123,6 +123,7 @@ const sizeText = computed(() => {
       <summary>其他下载方式与安装说明</summary>
       <p class="muted">{{ QQ_GROUP_HINT }}</p>
       <div v-if="qqGroup" class="upd-qq-row"><span>内测群 {{ qqGroup }}</span><button class="btn btn-ghost btn-sm" @click="copyGroup">{{ copied ? '已复制' : '复制群号' }}</button></div>
+      <p class="muted">备用下载：夸克网盘 <a href="https://pan.quark.cn/s/d1f9625e4ad9" target="_blank" rel="noreferrer">https://pan.quark.cn/s/d1f9625e4ad9</a>（网盘内只保留最新版安装包）</p>
       <p class="muted">如果旧桌面快捷方式失效，请重新指向更新后的文件。</p>
     </details>
     <template #footer>

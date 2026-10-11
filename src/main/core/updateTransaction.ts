@@ -16,7 +16,19 @@ export interface UpdateTransaction {
   helperPid?: number
 }
 
-export const updateMarker = (exe: string): string => path.join(path.dirname(exe), '.kamuclupdate')
+export const updateMarker = (exe: string): string => path.join(path.dirname(exe), '.mclauncherupdate')
+export const legacyUpdateMarker = (exe: string): string => path.join(path.dirname(exe), '.kamuclupdate')
+/** 把旧版更新标记（.kamuclupdate*）迁移到新命名（.mclauncherupdate*），旧版下载的待应用事务无缝衔接 */
+export function migrateUpdateMarkers(exe: string): void {
+  const base = path.dirname(exe)
+  const legacy = legacyUpdateMarker(exe)
+  if (!fs.existsSync(legacy)) return
+  for (const suffix of ['', '.applying', '.applying.failed', '.applying.receipt.json', '.applying.completed']) {
+    const oldPath = legacy + suffix
+    const newPath = updateMarker(exe) + suffix
+    try { if (fs.existsSync(oldPath) && !fs.existsSync(newPath)) fs.renameSync(oldPath, newPath) } catch { /* 占用时保留旧名，下次再迁 */ }
+  }
+}
 export function atomicUpdateJson(file: string, data: unknown): void {
   fs.mkdirSync(path.dirname(file), { recursive: true })
   const tmp = file + '.' + randomUUID() + '.tmp'
