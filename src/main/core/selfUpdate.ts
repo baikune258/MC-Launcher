@@ -30,6 +30,10 @@ export const updateBodyPolicy = { timeoutMs: API_TIMEOUT_MS, maxBytes: 1024 * 10
 function apiBase(): string {
   return (isolatedUpdateTest() ? process.env.KAMUCL_UPDATE_API_BASE! : 'https://api.github.com').replace(/\/+$/, '')
 }
+/** 备用检查通道：仓库根 update.json（raw.githubusercontent.com 直连，国内可达且无 API 限流）。
+ * 每次发版都会同步更新该文件，内容与 Release 资产严格一致。 */
+const RAW_UPDATE_URL = `https://raw.githubusercontent.com/${GITHUB_REPO}/main/update.json`
+const RAW_UPDATE_CACHE_KEY = 'raw-update-cache'
 /** 文件下载基地址（镜像/mock 用；默认空 = 用 API 返回的 browser_download_url 原样） */
 function downloadBaseOverride(): string {
   return (isolatedUpdateTest() ? process.env.KAMUCL_UPDATE_DOWNLOAD_BASE || '' : '').replace(/\/+$/, '')
@@ -58,9 +62,15 @@ function cacheFile(): string {
 function readCache(): CheckCache | null {
   try {
     const j = JSON.parse(fs.readFileSync(cacheFile(), 'utf-8'))
-    if (j && typeof j === 'object' && (!j.source || j.source === apiBase()) && (!j.latest || trustedUpdateRelease(j.latest))) return j as CheckCache
+    if (j && typeof j === 'object' && (!j.source || j.source === apiBase()) && (!j.latest || trustedCachedRelease(j.latest))) return j as CheckCache
   } catch { /* 无缓存 */ }
   return null
+}
+
+/** 缓存可接受范围：API 严格校验（资产精确匹配），或本仓库 download URL 前缀的合法版本（raw 备用通道写入） */
+function trustedCachedRelease(r: ReleaseInfo): boolean {
+  return trustedUpdateRelease(r) ||
+    (/^\d+\.\d+\.\d+$/.test(r.version) && !!r.assetName && !!r.assetUrl && r.assetUrl.startsWith(`https://github.com/${GITHUB_REPO}/releases/download/`))
 }
 
 function writeCache(cache: CheckCache): void {
@@ -172,8 +182,42 @@ async function ghFetch(url: string, etag?: string, signal?: AbortSignal): Promis
 }
 
 /**
+ * 备用检查通道：读取仓库根 update.json（raw.githubusercontent.com）。
+ * 内容格式与 Release 资产严格一致；仅在 API 通道网络失败/限流时启用，
+ * 避免「检查不到新版本」被单通道网络问题卡死。返回经校验的 ReleaseInfo。
+ */
+async function fetchRawUpdate(signal?: AbortSignal): Promise<ReleaseInfo | null> {
+  try {
+    const res = await ghFetch(RAW_UPDATE_URL, undefined, signal)
+    if (!res.ok) { await res.body?.cancel().catch(() => {}); return null }
+    const j = JSON.parse((await readUpdateBody(res)).toString('utf8')) as {
+      latest?: string; assetName?: string; assetUrl?: string; publishedAt?: string; body?: string; sha256SumsUrl?: string
+    }
+    const version = String(j.latest ?? '').replace(/^v/i, '')
+    if (!/^\d+\.\d+\.\d+$/.test(version)) return null
+    const name = updateAssetName(version)
+    if (j.assetName !== name) return null
+    const expectedUrl = `https://github.com/${GITHUB_REPO}/releases/download/v${version}/${name}`
+    if (j.assetUrl !== expectedUrl) return null
+    if (typeof j.sha256SumsUrl !== 'string' || !/^https:\/\/github\.com\/[^/]+\/[^/]+\/releases\/download\/v[\d.]+\/SHA256SUMS\.txt$/.test(j.sha256SumsUrl)) return null
+    const release: ReleaseInfo = {
+      version,
+      publishedAt: String(j.publishedAt ?? ''),
+      body: String(j.body ?? ''),
+      assetUrl: expectedUrl,
+      assetSize: 0,
+      assetName: name
+    }
+    return release
+  } catch (e) {
+    updateLog.debug('备用更新通道读取失败', e)
+    return null
+  }
+}
+
+/**
  * 检查最新 Release。force=false 时 6h 缓存有效直接返回缓存；
- * 网络失败/限流静默降级（有缓存回退缓存）。
+ * 网络失败/限流静默降级（有缓存回退缓存，否则走备用 raw 通道）。
  */
 export async function checkLatest(force = false): Promise<UpdateCheckResult> {
   const current = currentVersion()
@@ -195,7 +239,13 @@ export async function checkLatest(force = false): Promise<UpdateCheckResult> {
     }
     if (res.status === 403 || res.status === 429) {
       const remain = res.headers.get('x-ratelimit-remaining')
-      updateLog.info(`GitHub API 限流（remaining=${remain}），静默降级`)
+      updateLog.info(`GitHub API 限流（remaining=${remain}），走备用通道`)
+      const raw = await fetchRawUpdate()
+      if (raw) {
+        writeCache({ etag: cache?.etag, checkedAt: Date.now(), latest: raw })
+        const has = isNewerVersion(raw.version, current)
+        return { ok: true, hasUpdate: has, release: raw, reason: 'rate-limited' }
+      }
       if (!force && cache?.latest !== undefined) {
         const has = !!cache.latest && isNewerVersion(cache.latest.version, current)
         return { ok: true, hasUpdate: has, release: cache.latest ?? undefined, fromCache: true, reason: 'rate-limited' }
@@ -214,7 +264,13 @@ export async function checkLatest(force = false): Promise<UpdateCheckResult> {
     const has = !!latest && isNewerVersion(latest.version, current)
     return { ok: true, hasUpdate: has, release: latest ?? undefined }
   } catch (e) {
-    updateLog.info('更新检查失败（静默降级）', e)
+    updateLog.info('更新检查失败，走备用通道', e)
+    const raw = await fetchRawUpdate()
+    if (raw) {
+      writeCache({ etag: cache?.etag, checkedAt: Date.now(), latest: raw })
+      const has = isNewerVersion(raw.version, current)
+      return { ok: true, hasUpdate: has, release: raw, reason: 'network' }
+    }
     if (!force && cache?.latest !== undefined) {
       const has = !!cache.latest && isNewerVersion(cache.latest.version, current)
       return { ok: true, hasUpdate: has, release: cache.latest ?? undefined, fromCache: true, reason: 'network' }

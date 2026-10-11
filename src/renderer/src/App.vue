@@ -91,6 +91,7 @@ const BridgeView = defineAsyncComponent(() => import('./views/BridgeView.vue'))
 const SkinsView = defineAsyncComponent(() => import('./views/SkinsView.vue'))
 const CommunityView = defineAsyncComponent(() => import('./views/CommunityView.vue'))
 const ServersView = defineAsyncComponent(() => import('./views/ServersView.vue'))
+const HostServerView = defineAsyncComponent(() => import('./views/HostServerView.vue'))
 const FriendConnectView = defineAsyncComponent(() => import('./views/FriendConnectView.vue'))
 const SettingsView = defineAsyncComponent(() => import('./views/SettingsView.vue'))
 const AccountsView = defineAsyncComponent(() => import('./views/AccountsView.vue'))
@@ -114,6 +115,7 @@ const viewMap: Record<ViewName, Component> = {
   skins: SkinsView,
   community: CommunityView,
   servers: ServersView,
+  hostserver: HostServerView,
   friends: FriendConnectView,
   settings: SettingsView,
   accounts: AccountsView
@@ -131,6 +133,11 @@ const navItems: Array<{ key: ViewName; label: string; icon: string }> = [
     key: 'game',
     label: '游戏版本',
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="11" rx="5.5"/><path d="M7.5 10.8v3.4M5.8 12.5h3.4"/><circle cx="15.6" cy="11.9" r="0.6" fill="currentColor" stroke="none"/><circle cx="18" cy="13.6" r="0.6" fill="currentColor" stroke="none"/></svg>'
+  },
+  {
+    key: 'hostserver',
+    label: '在线服务器',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/><path d="M15 7.5h2M15 16.5h2"/></svg>'
   },
   {
     key: 'friends',

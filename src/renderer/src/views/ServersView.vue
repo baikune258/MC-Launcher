@@ -16,14 +16,7 @@ import {
   pingServer,
   prepareServerLaunch,
   removeServer,
-  syncServersFromDat,
-  listHostServers,
-  createHostServer,
-  startHostServer,
-  stopHostServer,
-  hostServerStatus,
-  deleteHostServer,
-  getManifest
+  syncServersFromDat
 } from '../api'
 import ConnectionStatus from '../components/connection/ConnectionStatus.vue'
 import ServerListItem from '../components/connection/ServerListItem.vue'
@@ -33,7 +26,7 @@ import { privateServerText, serverAddressRevealed } from '@shared/serverPrivacy'
 import { serverVersionDisplay } from '@shared/serverVersionDisplay'
 import '../components/connection/connection.css'
 import { selectInstance, selectedInstance, refreshInstalled, store, toast } from '../store'
-import type { InstalledVersion, ServerEntry, ServerPingResult, HostServerRecord, HostServerStatus, HostServerCreateInput, RemoteVersion } from '@shared/types'
+import type { InstalledVersion, ServerEntry, ServerPingResult } from '@shared/types'
 
 // ---------------- 列表与状态 ----------------
 const servers = ref<ServerEntry[]>([])
@@ -385,114 +378,6 @@ async function copyAddress(s: ServerEntry) {
   try { toast(await copyText(s.address) ? '服务器地址已复制' : '复制失败', 'info') }
   catch (e) { toast(publicMessage(errText(e)), 'error') }
 }
-
-// ---------------- 在线服务器（自建常驻服） ----------------
-const hostServers = ref<HostServerRecord[]>([])
-const hostStatus = reactive<Record<string, HostServerStatus>>({})
-const hostBusy = ref('')
-const hostCreate = reactive({ open: false, busy: false, error: '', name: '', mcVersion: '', port: 25565, ramMb: 2048, autoResume: true, onlineMode: false })
-const hostVersions = ref<RemoteVersion[]>([])
-const hostLogOpen = ref<Record<string, boolean>>({})
-const hostLoaded = ref(false)
-
-async function loadHostServers() {
-  try {
-    hostServers.value = await listHostServers()
-    hostLoaded.value = true
-    refreshHostStatuses()
-  } catch { /* 静默 */ }
-}
-async function refreshHostStatuses() {
-  for (const s of hostServers.value) {
-    try { hostStatus[s.id] = await hostServerStatus(s.id) } catch { /* 忽略 */ }
-  }
-}
-async function openHostCreate() {
-  hostCreate.error = ''
-  if (!hostVersions.value.length) {
-    try { hostVersions.value = (await getManifest()).filter((v) => v.type === 'release').slice(0, 30) } catch { hostCreate.error = '读取版本列表失败' }
-  }
-  hostCreate.mcVersion = hostCreate.mcVersion || hostVersions.value[0]?.id || ''
-  hostCreate.open = true
-}
-async function onHostCreate() {
-  hostCreate.busy = true
-  hostCreate.error = ''
-  try {
-    const input: HostServerCreateInput = {
-      name: hostCreate.name,
-      mcVersion: hostCreate.mcVersion,
-      port: hostCreate.port,
-      ramMb: hostCreate.ramMb,
-      autoResume: hostCreate.autoResume,
-      onlineMode: hostCreate.onlineMode
-    }
-    const record = await createHostServer(input)
-    hostServers.value = await listHostServers()
-    hostCreate.open = false
-    hostCreate.name = ''
-    toast(`服务器「${record.name}」已创建，正在启动…`, 'success')
-    await onHostStart(record.id)
-  } catch (e) {
-    hostCreate.error = errText(e)
-  } finally {
-    hostCreate.busy = false
-  }
-}
-async function onHostStart(id: string) {
-  hostBusy.value = id
-  try {
-    hostStatus[id] = await startHostServer(id)
-    toast(hostStatus[id]?.online ? '服务器已就绪，可以加入' : '服务器进程已启动，等待就绪…', 'info')
-  } catch (e) {
-    toast('启动失败：' + errText(e), 'error')
-  } finally {
-    hostBusy.value = ''
-  }
-}
-async function onHostStop(id: string) {
-  hostBusy.value = id
-  try {
-    await stopHostServer(id)
-    const st = await hostServerStatus(id)
-    hostStatus[id] = { ...st, running: false, online: false }
-    toast('服务器已停止', 'info')
-  } catch (e) {
-    toast('停止失败：' + errText(e), 'error')
-  } finally {
-    hostBusy.value = ''
-  }
-}
-async function onHostDelete(id: string) {
-  if (!confirm('确定删除该服务器吗？服务器目录（世界存档）会一并删除。')) return
-  try {
-    await deleteHostServer(id)
-    hostServers.value = hostServers.value.filter((s) => s.id !== id)
-    delete hostStatus[id]
-    toast('服务器已删除', 'success')
-  } catch (e) {
-    toast('删除失败：' + errText(e), 'error')
-  }
-}
-async function copyHostAddress(id: string) {
-  const st = hostStatus[id]
-  if (!st?.address) return
-  try { toast(await copyText(st.address) ? '地址已复制，发给好友即可加入（同一网络）' : '复制失败', 'info') }
-  catch (e) { toast('复制失败：' + errText(e), 'error') }
-}
-const hostStateText = (s: HostServerRecord) => {
-  const st = hostStatus[s.id]
-  if (st?.online) return '在线'
-  if (st?.running) return '启动中'
-  return '已停止'
-}
-const hostStateClass = (s: HostServerRecord) => {
-  const st = hostStatus[s.id]
-  if (st?.online) return 'host-online'
-  if (st?.running) return 'host-booting'
-  return 'host-off'
-}
-onMounted(() => { void loadHostServers() })
 </script>
 
 <template>
@@ -501,36 +386,6 @@ onMounted(() => { void loadHostServers() })
       <div><h1 data-ui="ServersView:ee8e70e0acab">服务器 <small>{{ servers.length }} 个 · {{ onlineCount }} 个在线</small></h1></div>
       <button data-ui="ServersView:c8a77fb10c66" class="btn btn-gold" :disabled="loading" @click="openAdd()"><span data-ui="ServersView:12718dc300bd" aria-hidden="true">＋</span> 添加服务器</button>
     </header>
-
-    <!-- 在线服务器（自建常驻服） -->
-    <section v-if="hostLoaded" class="host-server-panel" aria-label="在线服务器">
-      <div class="host-server-head">
-        <div><h2 class="host-server-title">在线服务器 <small>自建常驻 · 一直开着等好友加入</small></h2></div>
-        <button class="btn btn-gold btn-sm" @click="openHostCreate()">＋ 创建服务器</button>
-      </div>
-      <p v-if="!hostServers.length" class="connection-muted host-empty">还没有自建服务器。创建后会下载原版服务端，启动后一直后台运行（关闭启动器也继续），好友用地址即可加入。</p>
-      <div v-else class="host-server-list">
-        <div v-for="s in hostServers" :key="s.id" class="host-server-card">
-          <div class="host-card-main">
-            <span class="host-state" :class="hostStateClass(s)"><i aria-hidden="true"></i>{{ hostStateText(s) }}</span>
-            <div class="host-card-info">
-              <strong>{{ s.name }}</strong>
-              <span class="muted host-meta">{{ s.mcVersion }} · 端口 {{ s.port }} · {{ s.ramMb }}M · {{ s.autoResume ? '自动拉起' : '手动启动' }}</span>
-            </div>
-            <div class="host-card-actions">
-              <button class="btn btn-ghost btn-sm" :disabled="hostBusy === s.id" @click="copyHostAddress(s.id)">复制地址</button>
-              <button v-if="!hostStatus[s.id]?.running" class="btn btn-gold btn-sm" :disabled="hostBusy === s.id" @click="onHostStart(s.id)">启动</button>
-              <button v-else class="btn btn-danger btn-sm" :disabled="hostBusy === s.id" @click="onHostStop(s.id)">停止</button>
-              <button class="btn btn-ghost btn-sm" @click="hostLogOpen[s.id] = !hostLogOpen[s.id]">{{ hostLogOpen[s.id] ? '收起日志' : '日志' }}</button>
-              <button class="btn btn-ghost btn-sm host-del" @click="onHostDelete(s.id)">删除</button>
-            </div>
-          </div>
-          <p v-if="hostStatus[s.id]?.address" class="host-address">加入地址：<code>{{ hostStatus[s.id]?.address }}</code><span class="muted">（同一网络的好友可加入；公网联机可在联机面板配置樱花穿透）</span></p>
-          <p v-if="hostStatus[s.id]?.online && hostStatus[s.id]?.players" class="host-players muted">当前在线 {{ hostStatus[s.id]?.players }} 人</p>
-          <pre v-if="hostLogOpen[s.id]" class="host-log">{{ hostStatus[s.id]?.logTail || '暂无日志' }}</pre>
-        </div>
-      </div>
-    </section>
 
     <div data-ui="ServersView:eee6f822ac69" class="server-toolbar">
       <label data-ui="ServersView:fd69834ac923" class="server-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input data-ui="ServersView:3445c173cb2a" v-model="store.searchKeyword" type="search" placeholder="搜索名称、地址或服务器介绍" aria-label="搜索服务器" /></label>
@@ -553,30 +408,6 @@ onMounted(() => { void loadHostServers() })
     </div>
     <!-- 添加模态框 -->
     <Teleport to="body">
-      <div data-ui="ServersView:9f87bde5903a" v-if="hostCreate.open" class="modal-mask connection-modal" @pointerdown.self="!hostCreate.busy && (hostCreate.open = false)">
-        <div data-ui="ServersView:64843d40b149" class="modal" role="dialog" aria-modal="true" aria-label="创建在线服务器">
-          <h3 class="modal-title">创建在线服务器</h3><p data-ui="ServersView:0673ab93fcb6" class="connection-muted">下载原版服务端并后台常驻运行，关闭启动器也不会停；地址发给好友即可加入。</p><p data-ui="ServersView:ff5270751bc0" v-if="hostCreate.error" class="connection-error" role="alert">{{ hostCreate.error }}</p>
-          <label for="host-server-name" class="modal-label">服务器名称</label>
-          <input id="host-server-name" v-model="hostCreate.name" class="input" placeholder="例如：我的生存服" maxlength="40" />
-          <label for="host-server-version" class="modal-label">游戏版本（正式版）</label>
-          <select id="host-server-version" v-model="hostCreate.mcVersion" class="select">
-            <option v-for="v in hostVersions" :key="v.id" :value="v.id">{{ v.id }}</option>
-          </select>
-          <div class="host-form-row">
-            <div><label for="host-server-port" class="modal-label">端口</label><input id="host-server-port" v-model.number="hostCreate.port" type="number" class="input" min="1" max="65535" /></div>
-            <div><label for="host-server-ram" class="modal-label">内存（MB）</label><input id="host-server-ram" v-model.number="hostCreate.ramMb" type="number" class="input" min="512" max="16384" step="256" /></div>
-          </div>
-          <label class="modal-check"><input type="checkbox" v-model="hostCreate.autoResume" /> 启动器每次打开时自动拉起（一直开）</label>
-          <label class="modal-check"><input type="checkbox" v-model="hostCreate.onlineMode" /> 开启正版验证（online-mode，离线皮肤玩家无法加入）</label>
-          <div class="modal-actions">
-            <button class="btn btn-ghost" :disabled="hostCreate.busy" @click="hostCreate.open = false">取消</button>
-            <button class="btn btn-gold" :disabled="hostCreate.busy || !hostCreate.name.trim() || !hostCreate.mcVersion" @click="onHostCreate">
-              {{ hostCreate.busy ? '创建中…' : '创建并启动' }}
-            </button>
-          </div>
-        </div>
-      </div>
-
       <div data-ui="ServersView:9f87bde5903a" v-if="addModal.open" class="modal-mask connection-modal" @pointerdown.self="!addModal.busy && (addModal.open = false)">
         <div data-ui="ServersView:64843d40b149" class="modal" role="dialog" aria-modal="true" aria-label="服务器操作">
           <h3 class="modal-title">{{ addModal.id ? '编辑服务器' : '添加服务器' }}</h3><p data-ui="ServersView:0673ab93fcb6" class="connection-muted">只修改启动器记录，不会覆盖游戏内服务器列表。</p><p data-ui="ServersView:ff5270751bc0" v-if="addModal.error" class="connection-error" role="alert">{{ addModal.error }}</p>
@@ -726,30 +557,4 @@ onMounted(() => { void loadHostServers() })
 .servers-page .server-detail .connection-panel-head h2 { font-size:14px;color:var(--text-dim);font-weight:500; }
 @media(min-width:1121px) { .servers-page { max-width:1480px;margin-inline:auto;width:100%; }.servers-page .server-detail { position:sticky;top:0; } }
 @media(max-width:1120px) { .servers-page .server-workspace { grid-template-columns:minmax(0,1fr); }.servers-page .server-list{max-height:360px;overflow:auto}.servers-page .server-detail{position:static} }
-
-/* 在线服务器（自建常驻服） */
-.host-server-panel { display:flex;flex-direction:column;gap:12px;padding:16px;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--surface-content); }
-.host-server-head { display:flex;align-items:center;justify-content:space-between;gap:12px; }
-.host-server-title { margin:0;font-size:16px; }
-.host-server-title small { margin-left:8px;font-size:12px;font-weight:400;color:var(--text-dim); }
-.host-empty { margin:0;line-height:1.7; }
-.host-server-list { display:flex;flex-direction:column;gap:10px; }
-.host-server-card { border:1px solid var(--border);border-radius:var(--radius-md);padding:12px 14px;background:var(--card-1); }
-.host-card-main { display:flex;align-items:center;gap:12px;flex-wrap:wrap; }
-.host-state { display:inline-flex;align-items:center;gap:6px;font-size:12px;min-width:58px; }
-.host-state i { width:8px;height:8px;border-radius:50%;background:currentColor; }
-.host-online { color:var(--success, #4ade80); }
-.host-booting { color:var(--accent-2); }
-.host-off { color:var(--text-dim); }
-.host-card-info { display:flex;flex-direction:column;gap:2px;min-width:0;flex:1; }
-.host-meta { font-size:12px; }
-.host-card-actions { display:flex;gap:8px;flex-wrap:wrap; }
-.host-del { color:var(--danger); }
-.host-address { margin:10px 0 0;font-size:13px; }
-.host-address code { padding:2px 8px;border-radius:6px;background:var(--hover);font-size:13px; }
-.host-players { margin:4px 0 0;font-size:12px; }
-.host-log { margin:10px 0 0;max-height:180px;overflow:auto;padding:10px;border-radius:8px;background:var(--bg-2, #00000066);font-size:12px;line-height:1.6;white-space:pre-wrap;word-break:break-all; }
-.host-form-row { display:grid;grid-template-columns:1fr 1fr;gap:12px; }
-.modal-check { display:flex;align-items:center;gap:8px;margin:10px 0 0;font-size:13px;color:var(--text-dim);cursor:pointer; }
-.modal-check input { width:16px;height:16px;accent-color:var(--accent); }
 </style>

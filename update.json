@@ -1,0 +1,8 @@
+{
+  "latest": "1.1.37",
+  "assetName": "MC-Launcher-1.1.37.exe",
+  "assetUrl": "https://github.com/baikune258/MC-Launcher/releases/download/v1.1.37/MC-Launcher-1.1.37.exe",
+  "publishedAt": "2026-10-11T00:45:00Z",
+  "body": "修复了一些BUG或问题",
+  "sha256SumsUrl": "https://github.com/baikune258/MC-Launcher/releases/download/v1.1.37/SHA256SUMS.txt"
+}

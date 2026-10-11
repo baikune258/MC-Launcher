@@ -26,6 +26,7 @@ export type ViewName =
   | 'skins'
   | 'community'
   | 'servers'
+  | 'hostserver'
   | 'friends'
   | 'settings'
   | 'accounts'
