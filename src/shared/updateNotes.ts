@@ -8,6 +8,7 @@ export interface UpdateNote {
 
 /** 按版本倒序；latest 为当前版本 */
 export const updateNotes: UpdateNote[] = [
+  {"version":"1.1.48","date":"2026-10-12 13:00","changes":["新增设置：自定义微软登录应用"]},
   {"version":"1.1.47","date":"2026-10-12 12:00","changes":["修复了一些BUG或问题"]},
   {"version":"1.1.46","date":"2026-10-12 11:30","changes":["修复了一些BUG或问题"]},
   {"version":"1.1.45","date":"2026-10-12 10:30","changes":["修复了一些BUG或问题"]},

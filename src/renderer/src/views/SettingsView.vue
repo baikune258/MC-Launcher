@@ -706,7 +706,7 @@ async function onRemovePlugin(p: PluginInfo) {
             <span data-ui="SettingsView:53c4924a8276" class="collapse-arrow" aria-hidden="true"></span>
           </summary>
           <div data-ui="SettingsView:7d7409e56805" class="collapse-body">
-      <!-- 下载镜像（微软登录 Client ID 按隐私要求不在界面展示，登录固定使用内置默认应用） -->
+      <!-- 下载镜像 -->
       <div data-ui="SettingsView:95f82195a3e7" v-show="category === 'downloads'" data-section="mirror" class="download-mirror-group">
         <div data-ui="SettingsView:df1b5ac2d829" class="download-mirror-options">
           <h3 data-ui="SettingsView:377562d71363" class="group-title">下载镜像</h3>
@@ -720,6 +720,10 @@ async function onRemovePlugin(p: PluginInfo) {
               <span data-ui="SettingsView:1063a9cd6367">BMCLAPI 镜像（国内更快）</span>
             </label>
           </div>
+          <label data-ui="SettingsView:a1b2c3d4e5f6" class="download-setting download-setting-col">微软登录应用（Client ID）
+            <input data-ui="SettingsView:b2c3d4e5f6a7" class="input" type="text" spellcheck="false" :value="store.settings.msClientId" @change="save({ msClientId: ($event.target as HTMLInputElement).value.trim() })" placeholder="留空使用内置默认应用" />
+            <small data-ui="SettingsView:c3d4e5f6a7b8" class="muted">在微软 Azure 门户注册自己的应用（名称与图标会显示在登录授权页），把“应用程序(客户端) ID”粘贴到这里。留空则使用内置默认应用。</small>
+          </label>
         </div>
       </div>
 

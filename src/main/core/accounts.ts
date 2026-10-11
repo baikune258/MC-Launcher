@@ -7,6 +7,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import type { Account, MsDeviceCodeInfo } from '../../shared/types'
+import { DEFAULT_MS_CLIENT_ID } from '../../shared/types'
 import { getSettings } from './settings'
 import * as yggdrasil from './yggdrasil'
 import { microsoftFetch } from './microsoftTls'
@@ -460,7 +461,7 @@ async function pollDeviceCode(
   expiresInSec: number,
   signal: AbortSignal
 ): Promise<Account> {
-  const clientId = getSettings().msClientId
+  const clientId = getSettings().msClientId || DEFAULT_MS_CLIENT_ID
   let interval = Math.max(1, intervalSec) * 1000
   const deadline = Date.now() + expiresInSec * 1000
   while (Date.now() < deadline) {
@@ -496,7 +497,7 @@ export async function beginMsDeviceCode(
   onDone: (account: Account | null, error?: string) => void
 ): Promise<MsDeviceCodeInfo> {
   cancelMsLogin() // 取消上一次未完成的轮询
-  const clientId = getSettings().msClientId
+  const clientId = getSettings().msClientId || DEFAULT_MS_CLIENT_ID
   const dc = await postForm(`${msAuthBase(clientId)}/devicecode`, {
     client_id: clientId,
     scope: MS_SCOPE

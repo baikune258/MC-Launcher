@@ -62,7 +62,7 @@ function defaults(): Settings {
     reduceMotion: false,
     uiWindowAutoFit: false,
     updateMirrorUrls: [],
-    msClientId: DEFAULT_MS_CLIENT_ID,
+    msClientId: "", // 留空=内置默认微软应用（Prism 公开应用），可在设置页替换为自注册应用
     theme: 'black-pink',
     custom: structuredClone(DEFAULT_CUSTOM_THEME),
     disabledFeatures: [],
@@ -202,6 +202,8 @@ export function getSettings(): Settings {
       : migratedResolution
     // 迁移：旧版默认 client_id（Mojang legacy 应用，不支持 device code）→ 新默认
     if (c.msClientId === '00000000402b5328') c.msClientId = def.msClientId
+    // 迁移：内置默认 client_id 显式值 → 空串（空串=使用内置默认应用，设置页不留显式 UUID）
+    if (c.msClientId === DEFAULT_MS_CLIENT_ID) c.msClientId = ''
     // 保证 activeFolder 指向已登记文件夹；gameDir 与 activeFolder 保持一致语义
     if (!c.folders.some((f) => f.path === c.activeFolder)) {
       c.activeFolder = c.folders.find((f) => f.isDefault)?.path ?? c.folders[0].path
