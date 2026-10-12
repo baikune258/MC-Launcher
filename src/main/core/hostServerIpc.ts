@@ -23,6 +23,7 @@ export const HOST_SERVER_IPC = {
   status: 'host-server:status',
   log: 'host-server:log',
   delete: 'host-server:delete',
+  command: 'host-server:command',
   resume: 'host-server:resume',
   progress: 'host-server:progress'
 } as const
