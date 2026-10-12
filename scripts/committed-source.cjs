@@ -4,7 +4,7 @@ const { execFileSync, spawnSync } = require('node:child_process')
 
 function readCommittedSource(root) {
   root = path.resolve(root)
-  const git = args => execFileSync('git', args, { cwd: root, maxBuffer: 96 * 1024 * 1024 })
+  const git = args => execFileSync('git', args, { cwd: root, maxBuffer: 1536 * 1024 * 1024 })
   const commit = git(['rev-parse', 'HEAD']).toString('utf8').trim()
   const requireClean = () => {
     const dirty = spawnSync('git', ['diff', '--quiet', 'HEAD', '--'], { cwd: root })
@@ -20,7 +20,7 @@ function readCommittedSource(root) {
     return { path: file, oid: match[3] }
   })
   if (!rows.length) throw Error('No committed source files')
-  const batch = execFileSync('git', ['cat-file', '--batch'], { cwd: root, input: rows.map(r => r.oid).join('\n') + '\n', maxBuffer: 96 * 1024 * 1024 })
+  const batch = execFileSync('git', ['cat-file', '--batch'], { cwd: root, input: rows.map(r => r.oid).join('\n') + '\n', maxBuffer: 1536 * 1024 * 1024 })
   let offset = 0
   const files = rows.map(row => {
     const end = batch.indexOf(10, offset)
