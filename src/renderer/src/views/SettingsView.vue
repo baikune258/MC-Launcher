@@ -38,7 +38,7 @@ import UpdateSources from '../components/UpdateSources.vue'
 import { autoMemoryMB } from '@shared/memory'
 import MemoryOrganizer from '../components/MemoryOrganizer.vue'
 import type { LocalUpdateCheck, PluginInfo, ReleaseInfo, Settings, UpdateStateInfo } from '@shared/types'
-import { QQ_GROUP_NUMBER } from '@shared/branding'
+import { QQ_GROUP_NUMBER, DEFAULT_SPONSOR_URL, SPONSOR_LIST } from '@shared/branding'
 import { useMotion } from '../motion'
 const { systemReduced } = useMotion()
 import { usePlatformUpdate } from '../composables/usePlatformUpdate'
@@ -65,7 +65,8 @@ const certTrustBusy = ref(false)
 async function loadCertTrust() {
   try { certTrusted.value = await certTrustStatus() } catch { certTrusted.value = null }
 }
-const sponsorUrl = ref(store.settings?.sponsorUrl || '')
+const sponsorUrl = ref(store.settings?.sponsorUrl || DEFAULT_SPONSOR_URL)
+const sponsorList = SPONSOR_LIST
 const sponsorBusy = ref(false)
 function saveSponsorUrl() {
   const url = sponsorUrl.value.trim()
@@ -74,8 +75,7 @@ function saveSponsorUrl() {
   toast('赞助链接已保存', 'success')
 }
 async function onSponsor() {
-  const url = (store.settings?.sponsorUrl || '').trim()
-  if (!url) { toast('请先在上方填写赞助链接（如爱发电主页）', 'error'); return }
+  const url = (store.settings?.sponsorUrl || '').trim() || DEFAULT_SPONSOR_URL
   sponsorBusy.value = true
   try { await openExternal(url) } catch (e) { toast('打开失败：' + errText(e), 'error') } finally { sponsorBusy.value = false }
 }
@@ -1141,6 +1141,13 @@ async function onRemovePlugin(p: PluginInfo) {
         <div data-ui="SettingsView:37c9e71b5f27" class="collapse-body">
           <div data-ui="SettingsView:adafc6ff9288" class="upd-row">
             <span data-ui="SettingsView:sponsor02" class="upd-label">赞助链接</span>
+            <span data-ui="SettingsView:sponsor05" class="upd-label">赞助者</span>
+            <span data-ui="SettingsView:sponsor06" class="upd-value sponsor-list">
+              <template v-if="sponsorList.length">
+                <span v-for="sp in sponsorList" :key="sp.name" class="sponsor-chip">{{ sp.name }}<i v-if="sp.tier">{{ sp.tier }}</i></span>
+              </template>
+              <template v-else>感谢每一位赞助者，名单陆续展示中 ❤</template>
+            </span>
             <input data-ui="SettingsView:sponsor03" class="input mono upd-input" :value="sponsorUrl" placeholder="https://afdian.com/a/你的主页" @change="saveSponsorUrl" @input="sponsorUrl = ($event.target as HTMLInputElement).value" aria-label="赞助链接" />
             <span data-ui="SettingsView:sponsor04" class="upd-label">当前版本</span>
             <span data-ui="SettingsView:7f2b62d69ce5" class="upd-value">v{{ appVersion }}</span>
@@ -1844,4 +1851,7 @@ async function onRemovePlugin(p: PluginInfo) {
 .download-accel-row input[type='checkbox'] { width:16px; height:16px; accent-color:var(--accent); }
 
 .upd-input { flex: 1 1 260px; min-width: 200px; font-size: var(--text-sm); }
+.sponsor-list { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.sponsor-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); font-size: var(--text-sm); }
+.sponsor-chip i { font-style: normal; color: var(--accent-2); font-size: 12px; }
 </style>
