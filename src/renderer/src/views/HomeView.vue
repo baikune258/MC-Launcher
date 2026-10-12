@@ -179,7 +179,9 @@ const percent = computed(() =>
   store.progress ? Math.round(progressMono(store.progress) * 100) : 0
 )
 const launchText = computed(() => {
-  if (launching.value) return store.progress?.text || '正在启动…'
+  // 启动中固定文案：阶段文字（如“修复资源库 …”）长度变化会撑动按钮布局，固定为短文案，
+  // 进度由按钮内进度条与首页状态提示表达，按钮本体不再跳动
+  if (launching.value) return '正在启动…'
   return running.value ? '再次启动' : launchFailed.value ? '重新启动' : '开始游戏'
 })
 // ---------------- 快捷行悬浮浮块（跟随指针在三格间平滑滑动） ----------------
@@ -865,9 +867,9 @@ onUnmounted(() => {
 .launch-combo:active { transform: translateY(0) scale(0.99); }
 .launch-main, .launch-arrow { position: relative; overflow: hidden; border: 0; background: var(--accent-grad); color: var(--on-accent); cursor: pointer; }
 .launch-main { flex: 1; min-width: 0; padding: 0 26px; font-family: inherit; font-size: 21px; font-weight: 800; letter-spacing: 0.5px; }
-.launch-content { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 12px; }
+.launch-content { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 12px; flex: 1; min-width: 0; }
 .launch-content svg { width: 22px; height: 22px; flex: none; }
-.launch-content span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.launch-content span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 1 auto; min-width: 0; }
 .launch-progress { position: absolute; inset: 0 auto 0 0; background: rgba(255, 255, 255, 0.25); transition: width 0.25s ease; }
 .launch-main:disabled { cursor: not-allowed; filter: saturate(0.75); }
 .launch-arrow { width: 62px; border-left: 1px solid rgba(255, 255, 255, 0.22); }
