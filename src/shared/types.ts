@@ -751,6 +751,7 @@ export const IPC = {
   hostServerStatus: 'host-server:status', // (id) => HostServerStatus
   hostServerLog: 'host-server:log', // (id) => string
   hostServerDelete: 'host-server:delete', // (id) => void
+  hostServerCommand: 'host-server:command', // (id, command) => void 服务器控制台命令
   hostServerResume: 'host-server:resume', // () => void
   hostServerUploadDatapack: 'host-server:uploadDatapack', // (id) => string | null  弹窗选 zip 数据包并装入世界目录
   hostServerUploadMod: 'host-server:uploadMod', // (id) => string | null  弹窗选 jar 模组并装入 mods 目录

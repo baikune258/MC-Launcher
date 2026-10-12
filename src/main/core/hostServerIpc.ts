@@ -8,6 +8,7 @@ import {
   hostServerStatus,
   hostServerLog,
   deleteHostServer,
+  sendHostCommand,
   resumeHostServers,
   type HostServerCreateInput,
   type HostServerRecord,
@@ -42,5 +43,6 @@ export function registerHostServerIpc(ipcMain: IpcMain, getWin: () => BrowserWin
   ipcMain.handle(HOST_SERVER_IPC.status, (_e, id: string): Promise<HostServerStatus> => hostServerStatus(String(id)))
   ipcMain.handle(HOST_SERVER_IPC.log, (_e, id: string): string => hostServerLog(String(id)))
   ipcMain.handle(HOST_SERVER_IPC.delete, async (_e, id: string): Promise<void> => deleteHostServer(String(id)))
+  ipcMain.handle(HOST_SERVER_IPC.command, (_e, id: string, command: string): void => sendHostCommand(String(id), String(command)))
   ipcMain.handle(HOST_SERVER_IPC.resume, (): void => resumeHostServers())
 }

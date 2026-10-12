@@ -107,7 +107,12 @@ function processAlive(pid: number | undefined): boolean {
   }
 }
 
-/** 服务器常驻进程：spawn 时 detached 且不随启动器退出，stdout/stderr 全部进日志文件 */
+/** 常驻服务进程的 stdin 引用（用于控制台命令）。启动器自身重启后无法重建该引用——
+ *  服务器仍由原进程运行（detached），此时命令行输入不可用，属服务端进程架构限制。 */
+const hostProcessStdin = new Map<string, NodeJS.WritableStream>()
+
+/** 服务器常驻进程：spawn 时 detached 且不随启动器退出，stdout/stderr 全部进日志文件；
+ *  stdin 改为管道，供「服务器控制台」发送 /op 等命令。 */
 function launchServerProcess(record: HostServerRecord): ChildProcess {
   const dir = serverDir(record.id)
   const javas = scanJava()
@@ -127,10 +132,31 @@ function launchServerProcess(record: HostServerRecord): ChildProcess {
     cwd: dir,
     detached: true,
     windowsHide: true,
-    stdio: ['ignore', fs.openSync(logFile(record.id), 'a'), fs.openSync(logFile(record.id), 'a')]
+    stdio: ['pipe', fs.openSync(logFile(record.id), 'a'), fs.openSync(logFile(record.id), 'a')]
   })
+  hostProcessStdin.set(record.id, child.stdin!)
+  child.once('exit', () => { hostProcessStdin.delete(record.id) })
   child.unref()
   return child
+}
+
+/** 向运行中的服务器发送一条控制台命令（如 /op 玩家名、/gamemode creative），
+ *  命令直接写入服务端 stdin，由服务端解析执行，无 shell 注入面。 */
+export function sendHostCommand(id: string, command: string): void {
+  const cmd = (command ?? '').trim()
+  if (!cmd) throw new Error('请输入要执行的命令')
+  const record = findRecord(id)
+  if (!record) throw new Error('服务器不存在')
+  if (!record.pid || !processAlive(record.pid)) throw new Error('服务器未在运行，无法执行命令')
+  const stdin = hostProcessStdin.get(id)
+  if (!stdin || stdin.destroyed) {
+    // 启动器重启过、原进程仍由系统托管（detached）时无法写入；给出明确提示
+    throw new Error('该服务器不是由当前启动器会话启动（可能已重启过启动器），控制台命令暂不可用；可重启服务器后再操作')
+  }
+  if (cmd.length > 200) throw new Error('命令过长（最多 200 字符）')
+  if (!/^[\/]?[\w@\-. ]+$/.test(cmd) && !/^[\/][\w@\-. ]+$/.test(cmd)) throw new Error('命令格式不正确')
+  stdin.write(cmd + '\n')
+  hostLog.info(`[控制台] > ${cmd}`)
 }
 
 function localAddress(port: number): string {
@@ -333,6 +359,7 @@ export async function stopHostServer(id: string): Promise<void> {
     }
   }
   record.pid = undefined
+  hostProcessStdin.delete(id)
   upsertRecord(record)
 }
 

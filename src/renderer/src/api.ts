@@ -474,6 +474,7 @@ export const stopHostServer = (id: string) => invoke<void>(IPC.hostServerStop, i
 export const hostServerStatus = (id: string) => invoke<HostServerStatus>(IPC.hostServerStatus, id)
 export const hostServerLog = (id: string) => invoke<string>(IPC.hostServerLog, id)
 export const deleteHostServer = (id: string) => invoke<void>(IPC.hostServerDelete, id)
+export const sendHostCommand = (id: string, command: string) => invoke<void>(IPC.hostServerCommand, id, command)
 export const resumeHostServers = () => invoke<void>(IPC.hostServerResume)
 export const uploadHostServerDatapack = (id: string) => invoke<string | null>(IPC.hostServerUploadDatapack, id)
 export const uploadHostServerMod = (id: string) => invoke<string | null>(IPC.hostServerUploadMod, id)

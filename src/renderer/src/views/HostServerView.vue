@@ -14,6 +14,7 @@ import {
   uploadHostServerMod,
   onHostServerProgress,
   openHostServerFolder,
+  sendHostCommand,
   getManifest
 } from '../api'
 import { toast } from '../store'
@@ -35,6 +36,26 @@ const hostCreateBusyText = computed(() => {
 })
 const hostVersions = ref<RemoteVersion[]>([])
 const hostLogOpen = ref<Record<string, boolean>>({})
+const hostConsole = ref<Record<string, { open: boolean; command: string; sending: boolean }>>({})
+function consoleOf(id: string) { return (hostConsole.value[id] ??= { open: false, command: '', sending: false }) }
+async function onHostConsoleOpen(id: string) {
+  consoleOf(id).open = true
+  try { await refreshHostStatuses() } catch { /* 忽略 */ }
+}
+async function onHostConsoleSend(id: string) {
+  const c = consoleOf(id)
+  const cmd = c.command.trim()
+  if (!cmd) { toast('请输入命令，如 /op 玩家名', 'error'); return }
+  c.sending = true
+  try {
+    await sendHostCommand(id, cmd)
+    c.command = ''
+    toast('命令已发送', 'success')
+    setTimeout(() => { void refreshHostStatuses() }, 800)
+  } catch (e) {
+    toast('命令发送失败：' + errText(e), 'error')
+  } finally { c.sending = false }
+}
 const hostLoaded = ref(false)
 const hostUploadBusy = ref('')
 let pollTimer: ReturnType<typeof setInterval> | undefined
@@ -216,6 +237,7 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
             <button class="btn btn-ghost btn-sm" :disabled="hostBusy === s.id" @click="copyHostAddress(s.id)">复制地址</button>
             <button v-if="!hostStatus[s.id]?.running" class="btn btn-gold btn-sm" :disabled="hostBusy === s.id" @click="onHostStart(s.id)">启动</button>
             <button v-else class="btn btn-danger btn-sm" :disabled="hostBusy === s.id" @click="onHostStop(s.id)">停止</button>
+            <button class="btn btn-ghost btn-sm" @click="onHostConsoleOpen(s.id)">控制台</button>
             <button class="btn btn-ghost btn-sm" @click="hostLogOpen[s.id] = !hostLogOpen[s.id]">{{ hostLogOpen[s.id] ? '收起日志' : '日志' }}</button>
             <button class="btn btn-ghost btn-sm host-del" @click="onHostDelete(s.id)">删除</button>
           </div>
@@ -224,6 +246,20 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
         <p v-if="hostStatus[s.id]?.online && hostStatus[s.id]?.players" class="host-players muted">当前在线 {{ hostStatus[s.id]?.players }} 人</p>
         <p class="muted host-type-hint">{{ hostTypeHint(s) }}</p>
         <pre v-if="hostLogOpen[s.id]" class="host-log">{{ hostStatus[s.id]?.logTail || '暂无日志' }}</pre>
+        <Teleport to="body">
+          <div v-if="consoleOf(s.id).open" class="modal-mask connection-modal" @pointerdown.self="consoleOf(s.id).open = false">
+            <div class="modal host-console-modal" role="dialog" aria-modal="true" aria-label="服务器控制台">
+              <h3 class="modal-title">服务器控制台 · {{ s.name }}</h3>
+              <p class="connection-muted">输入服务端命令并回车执行。给玩家 OP：输入 <code>/op 玩家名</code>；常用：<code>/gamemode creative 玩家名</code>、<code>/give 玩家名 minecraft:diamond 64</code>、<code>/say 你好</code>。</p>
+              <pre class="host-log">{{ hostStatus[s.id]?.logTail || '暂无日志' }}</pre>
+              <div class="host-console-input">
+                <input v-model="consoleOf(s.id).command" class="input mono" spellcheck="false" placeholder="/op 玩家名" maxlength="200" @keydown.enter.prevent="onHostConsoleSend(s.id)" />
+                <button class="btn btn-gold" :disabled="consoleOf(s.id).sending" @click="onHostConsoleSend(s.id)">{{ consoleOf(s.id).sending ? '发送中…' : '发送' }}</button>
+              </div>
+              <div class="modal-actions"><button class="btn btn-ghost" @click="consoleOf(s.id).open = false">关闭</button></div>
+            </div>
+          </div>
+        </Teleport>
       </div>
     </div>
 
@@ -294,6 +330,12 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
 .host-address code { padding:2px 8px; border-radius:6px; background:var(--hover); font-size:13px; }
 .host-players { margin:4px 0 0; font-size:12px; }
 .host-log { margin:10px 0 0; max-height:200px; overflow:auto; padding:10px; border-radius:8px; background:var(--bg-2, #00000066); font-size:12px; line-height:1.6; white-space:pre-wrap; word-break:break-all; }
+.host-console-modal { width:min(640px, calc(100vw - 32px)); }
+.host-console-modal .host-log { max-height:300px; margin:10px 0; }
+.host-console-input { display:flex; gap:8px; }
+.host-console-input .input { flex:1; }
+.host-console-input .btn { flex:none; }
+.host-console-modal code { padding:1px 6px; border-radius:4px; background:var(--hover); font-size:12px; }
 .host-form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 .host-type-picker { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 .host-type-option { display:flex; flex-direction:column; gap:4px; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius-md); cursor:pointer; transition:border-color .15s, background .15s; }
