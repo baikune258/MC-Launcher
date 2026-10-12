@@ -7,7 +7,7 @@
 // 在构建时变换模板，不修改 node_modules；升级模板后无法识别则阻止错误出包。
 const OLD_UNPACK_PLUGINS = 'StrCpy $INSTDIR "$PLUGINSDIR\\app"'
 const OLD_UNPACK_TEMP = 'StrCpy $INSTDIR "$TEMP\\${UNPACK_DIR_NAME}"'
-const NEW_UNPACK = 'StrCpy $INSTDIR "$EXEDIR\\MC-Launcher-runtime"'
+const NEW_UNPACK = 'StrCpy $INSTDIR "$EXEDIR\\MC-Launcher\\runtime"'
 
 function repairPortableScript(script, options = {}) {
   if (script.includes('; KAMUCL_EARLY_FEEDBACK')) return script

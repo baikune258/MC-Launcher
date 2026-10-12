@@ -53,10 +53,10 @@ export function updateSupported(): boolean {
 function updateDirOf(exe: string): string {
   if (process.platform === 'darwin') return macUpdateDir()
   if (process.platform === 'linux') return linuxUpdateDir()
-  return path.join(path.dirname(exe), 'MC-Launcher-update')
+  return path.join(path.dirname(exe), 'MC-Launcher', 'update')
 }
 function backupDirOf(exe: string): string {
-  return path.join(path.dirname(exe), 'MC-Launcher-backup')
+  return path.join(path.dirname(exe), 'MC-Launcher', 'backup')
 }
 
 function userDataDir(): string {
@@ -158,15 +158,25 @@ export function cleanupUpdateRemnants(): void {
     try { fs.rmSync(path.join(base, 'MC-Launcher-update'), { recursive: true, force: true }) } catch { /* 跳过 */ }
     try { fs.rmSync(path.join(base, 'KAMUCL-update'), { recursive: true, force: true }) } catch { /* 跳过 */ }
   }
-  // 3. 旧命名 KAMUCL-backup 迁移到 MC-Launcher-backup（只保留可回退的最新备份）
-  try {
-    const legacyBackup = path.join(base, 'KAMUCL-backup')
-    const newBackup = backupDirOf(exe)
-    if (fs.existsSync(legacyBackup) && !fs.existsSync(newBackup)) {
-      fs.renameSync(legacyBackup, newBackup)
-      try { fs.rmdirSync(legacyBackup) } catch { /* 已不存在 */ }
-    }
-  } catch { /* 迁移失败跳过 */ }
+  // 3. 旧命名 KAMUCL-backup 迁移到 MC-Launcher\backup；上一代命名 MC-Launcher-backup 迁移到 MC-Launcher\backup
+  //    （均只保留可回退的最新备份，并同步改写 update-state.json 的 backupPath 保证回退可用）
+  for (const legacyBackup of [path.join(base, 'KAMUCL-backup'), path.join(base, 'MC-Launcher-backup')]) {
+    try {
+      const newBackup = backupDirOf(exe)
+      if (fs.existsSync(legacyBackup) && !fs.existsSync(newBackup)) {
+        fs.renameSync(legacyBackup, newBackup)
+        try { fs.rmdirSync(legacyBackup) } catch { /* 已不存在 */ }
+        try {
+          const sf = stateFile()
+          const st = JSON.parse(fs.readFileSync(sf, 'utf-8'))
+          if (st && typeof st.backupPath === 'string' && st.backupPath.startsWith(legacyBackup)) {
+            st.backupPath = path.join(newBackup, path.basename(st.backupPath))
+            fs.writeFileSync(sf, JSON.stringify(st, null, 2), 'utf-8')
+          }
+        } catch { /* state 改写失败不影响启动 */ }
+      }
+    } catch { /* 迁移失败跳过 */ }
+  }
   // 4. MC-Launcher-backup：只保留最新备份（回退依赖），其余旧备份删除
   try {
     const backupDir = backupDirOf(exe)

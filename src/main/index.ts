@@ -31,17 +31,28 @@ import { configureRuntimeGraphics } from './runtimeGraphics'
 import { resynchronizeWindowsRestore } from './windowRestoreVisibility'
 import { adaptiveWindowOptions, attachUiWindowSizing } from './uiWindowSizing'
 
-// 便携版数据跟随安装目录：userData 移到 EXE 旁的 MC-Launcher-data，不写系统盘；
-// 首次启动自动把旧 %APPDATA% 数据搬过来并清掉 C 盘残留（卸载 = 删除整个文件夹）。
+// 便携版数据跟随安装目录：统一收纳到 EXE 旁的 MC-Launcher 文件夹（data/runtime/update/backup 子目录），
+// 不写系统盘；首次启动自动把旧 %APPDATA% 数据搬过来并清掉 C 盘残留（卸载 = 删除整个文件夹）。
 const PORTABLE_EXE = process.env.PORTABLE_EXECUTABLE_FILE
 const LEGACY_USER_DATA = app.getPath('userData')
 if (PORTABLE_EXE) {
-  try { app.setPath('userData', join(dirname(PORTABLE_EXE), 'MC-Launcher-data')) } catch (error) { console.warn('[MC-Launcher] userData 重定向失败', error) }
-  // 旧版运行时目录 KAMUCL-runtime（仅启动器自身二进制缓存，游戏数据都在 MC-Launcher-data）：
-  // 新版本解压到 MC-Launcher-runtime 后，旧的上一代缓存目录已无进程占用，启动时清理掉，
-  // 避免安装目录残留原作者命名的文件夹；删除失败（如仍有旧进程占用）仅记日志不打断启动。
-  const legacyRuntime = join(dirname(PORTABLE_EXE), 'KAMUCL-runtime')
-  try { if (existsSync(legacyRuntime)) rmSync(legacyRuntime, { recursive: true, force: true }) } catch (error) { console.warn('[MC-Launcher] 旧运行时目录清理失败', error) }
+  const baseDir = dirname(PORTABLE_EXE)
+  const launcherDir = join(baseDir, 'MC-Launcher')
+  const newUserData = join(launcherDir, 'data')
+  try {
+    // 旧命名 MC-Launcher-data → MC-Launcher\data（设置与账号必须保留，rename 保证完整迁移）
+    if (!existsSync(newUserData)) {
+      const legacyData = join(baseDir, 'MC-Launcher-data')
+      if (existsSync(legacyData)) { try { renameSync(legacyData, newUserData) } catch (error) { console.warn('[MC-Launcher] 旧数据目录迁移失败', error) } }
+    }
+    app.setPath('userData', existsSync(newUserData) ? newUserData : join(baseDir, 'MC-Launcher-data'))
+  } catch (error) { console.warn('[MC-Launcher] userData 重定向失败', error) }
+  // 旧版运行时目录（KAMUCL-runtime 与上一代 MC-Launcher-runtime）：
+  // 新版本解压到 MC-Launcher\runtime 后，旧的缓存目录已无进程占用，启动时清理掉，
+  // 避免安装目录残留多余文件夹；删除失败（如仍有旧进程占用）仅记日志不打断启动。
+  for (const legacyRuntime of [join(baseDir, 'KAMUCL-runtime'), join(baseDir, 'MC-Launcher-runtime')]) {
+    try { if (existsSync(legacyRuntime)) rmSync(legacyRuntime, { recursive: true, force: true }) } catch (error) { console.warn('[MC-Launcher] 旧运行时目录清理失败', error) }
+  }
 }
 
 configureRuntimeGraphics(app.commandLine, process.platform, dirname(process.execPath))

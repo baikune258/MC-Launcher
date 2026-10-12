@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 在线服务器：自建常驻服独立板块
-import { computed, onMounted, onBeforeUnmount, reactive, ref } from 'vue'
+import { computed, onMounted, onBeforeUnmount, reactive, ref, nextTick } from 'vue'
 import {
   copyText,
   errText,
@@ -51,6 +51,7 @@ async function refreshHostStatuses() {
     try { hostStatus[s.id] = await hostServerStatus(s.id) } catch { /* 忽略 */ }
   }
 }
+const hostNameInput = ref<HTMLInputElement | null>(null)
 async function openHostCreate() {
   hostCreate.error = ''
   if (!hostVersions.value.length) {
@@ -58,6 +59,8 @@ async function openHostCreate() {
   }
   hostCreate.mcVersion = hostCreate.mcVersion || hostVersions.value[0]?.id || ''
   hostCreate.open = true
+  await nextTick()
+  try { hostNameInput.value?.focus() } catch { /* 聚焦失败不影响 */ }
 }
 async function onHostCreate() {
   hostCreate.busy = true
@@ -229,7 +232,7 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
         <div class="modal" role="dialog" aria-modal="true" aria-label="创建在线服务器">
           <h3 class="modal-title">创建在线服务器</h3><p class="connection-muted">自动下载服务端并后台常驻运行，关闭启动器也不会停；地址发给好友即可加入。</p><p v-if="hostCreate.error" class="connection-error" role="alert">{{ hostCreate.error }}</p>
           <label for="host-server-name" class="modal-label">服务器名称</label>
-          <input id="host-server-name" v-model="hostCreate.name" class="input" placeholder="例如：我的生存服" maxlength="40" />
+          <input id="host-server-name" ref="hostNameInput" v-model="hostCreate.name" class="input" placeholder="例如：我的生存服" maxlength="40" autocomplete="off" spellcheck="false" />
           <label class="modal-label">服务器类型</label>
           <div class="host-type-picker">
             <label class="host-type-option" :class="{ 'host-type-active': hostCreate.type === 'datapack' }">
@@ -294,6 +297,7 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
 .host-form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 .host-type-picker { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 .host-type-option { display:flex; flex-direction:column; gap:4px; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius-md); cursor:pointer; transition:border-color .15s, background .15s; }
+input[id^="host-server-"], .connection-modal input { user-select: text; -webkit-user-select: text; }
 .host-type-option input { position:absolute; opacity:0; pointer-events:none; }
 .host-type-option.host-type-active { border-color:var(--accent); background:var(--hover); }
 .host-type-name { font-size:14px; font-weight:700; }

@@ -44,9 +44,10 @@ export function readUpdateTransaction(file: string, target: string): UpdateTrans
     // 防止任意路径被当作更新源。v1.1.35 起暂存目录改用 MC-Launcher 专属命名，此处须同时兼容新旧命名，
     // 否则下载完成的事务永远读不到，导致「重启后仍是老版本」。
     const rel = path.relative(path.dirname(target), t.file)
-    const firstSeg = rel.split(/[\\/]/)[0]
+    const segs = rel.split(/[\\/]/)
+    const firstSeg = segs[0]
     const trustedDir = !!rel && !rel.startsWith('..') && !path.isAbsolute(rel)
-      && (firstSeg === 'MC-Launcher-update' || firstSeg === 'KAMUCL-update')
+      && (firstSeg === 'MC-Launcher' ? segs[1] === 'update' : firstSeg === 'MC-Launcher-update' || firstSeg === 'KAMUCL-update')
     const key = (p: string) => process.platform === 'win32' ? path.resolve(p).toLowerCase() : path.resolve(p)
     if (t.schema !== 1 || !/^[a-f\d-]{36}$/i.test(t.id) || key(t.target) !== key(target)
       || !trustedDir || !/^[a-f\d]{64}$/i.test(t.sha256)

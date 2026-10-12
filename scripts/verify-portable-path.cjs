@@ -17,7 +17,7 @@ assert.equal(result.status, 0, result.stderr)
 assert.ok(fs.existsSync(marker), 'Inner Electron did not start')
 const proof = JSON.parse(fs.readFileSync(marker, 'utf8'))
 // 便携版解压到 exe 所在文件夹的固定子目录 MC-Launcher-runtime（不再占用系统 TEMP 随机目录）
-assert.ok(proof.exe.startsWith(path.join(root, 'MC-Launcher-runtime')), 'must unpack next to the portable exe, got: ' + proof.exe)
+assert.ok(proof.exe.startsWith(path.join(root, 'MC-Launcher', 'runtime')), 'must unpack next to the portable exe, got: ' + proof.exe)
 assert.ok(proof.exe.endsWith('MC-Launcher.exe'))
 fs.writeFileSync(path.join(root, 'verification.json'), JSON.stringify({ version, status: result.status, proof, pass: true }, null, 2))
 console.log('PASS portable quoting and inner startup: ' + root)
