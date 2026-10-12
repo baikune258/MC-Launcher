@@ -116,6 +116,10 @@ try {
     Start-Sleep -Milliseconds 500
   }
   Log 'Old process exited; verifying payload'
+  # 清扫仍指向旧程序文件的残留进程（Electron 渲染/GPU 子进程、历史残留实例），
+  # 确保替换与新版启动前旧版进程树全部清零，任务管理器不再残留旧 MC-Launcher 进程
+  Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $oldExe } | Stop-Process -Force -ErrorAction SilentlyContinue
+  Start-Sleep -Milliseconds 800
   if ((Hash-File $newExe) -ne $expected) { throw 'Update payload checksum changed' }
   if ((Hash-File $oldExe) -ne $oldHash) { throw 'Target changed; refusing replacement' }
   New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
