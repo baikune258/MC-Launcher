@@ -132,11 +132,11 @@ async function main() {
     process.exit(1)
   }
 
-  // Bind both draft creation and publication to the reviewed master commit.
+  // Bind both draft creation and publication to the reviewed default-branch commit.
   // GitHub may otherwise leave a published draft on an untagged-* reference.
   const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
-  const masterResponse = await api('GET', `https://api.github.com/repos/${REPO}/branches/master`, token)
-  if (!masterResponse.ok || (await masterResponse.json()).commit?.sha !== commit) throw new Error('本地 HEAD 尚未同步到 origin/master，停止发布')
+  const masterResponse = await api('GET', `https://api.github.com/repos/${REPO}/branches/main`, token)
+  if (!masterResponse.ok || (await masterResponse.json()).commit?.sha !== commit) throw new Error('本地 HEAD 尚未同步到 origin/main，停止发布')
   const existingTag = await taggedCommit(token)
   if (existingTag && existingTag !== commit) throw new Error('版本标签已指向其他提交，保留远端标签并停止发布')
   const binding = { tag_name: tag, target_commitish: commit, name: `MC-Launcher ${tag}`, body, prerelease: false }
