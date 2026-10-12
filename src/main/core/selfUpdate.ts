@@ -330,6 +330,8 @@ export async function listReleases(): Promise<ReleaseInfo[]> {
       .map(toReleaseInfo)
       .filter((r): r is ReleaseInfo => !!r && !!r.assetUrl)
       .filter((r) => compareSemver(r.version, ROLLBACK_MIN_VERSION) >= 0 && compareSemver(r.version, current) < 0)
+      // 回退候选最多保留最近 10 个版本（GitHub 按发布时间倒序返回）
+      .slice(0, 10)
   } catch (e) {
     updateLog.info('获取历史版本列表失败', e)
     return []
