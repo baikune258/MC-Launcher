@@ -502,11 +502,16 @@ export async function installModpackToHostServer(id: string, filePath: string, o
         if (!url) continue
         const sha1 = f.hashes?.sha1?.toLowerCase()
         const sha512 = f.hashes?.sha512?.toLowerCase()
-        tasks.push({ url, urls: [url], dest: path.join(modsDir, path.basename(p)), size: f.size, sha1, sha512 })
+        const fileName = path.basename(p)
+        tasks.push({ label: fileName, url, urls: [url], dest: path.join(modsDir, fileName), size: f.size, sha1, sha512 })
       }
-      for (let i = 0; i < tasks.length; i += 8) {
-        const batch = tasks.slice(i, i + 8)
-        await downloadAll(batch, (d, t) => onProgress?.('下载整合包模组', 10 + Math.round(((i + d / Math.max(1, t)) / tasks.length) * 80)), 4, getSettings().mirror)
+      if (tasks.length) {
+        await downloadAll(tasks, (d, t, _speed, detail) => {
+          const doneN = detail.completedFiles ?? Math.min(d, t)
+          const active = detail.activeFiles?.length ? `（${detail.activeFiles.join('、')}）` : ''
+          const waited = detail.waits?.length ? ' · 下载源繁忙，正在重试' : ''
+          onProgress?.(`下载整合包模组 ${doneN}/${tasks.length}${active}${waited}`, 5 + Math.round((doneN / tasks.length) * 85))
+        }, 4, getSettings().mirror)
       }
       mods = tasks.length
       overrides += applyOverridesToServer(tmp, serverRoot, 'overrides') + applyOverridesToServer(tmp, serverRoot, 'server-overrides')
@@ -521,7 +526,7 @@ export async function installModpackToHostServer(id: string, filePath: string, o
         const f = files[i] as { projectID: number; fileID: number }
         try {
           const dl = await resolveCurseForgeDownload(f.projectID, f.fileID, sources, AbortSignal.timeout(15000))
-          await downloadAll([{ url: dl.url, urls: [dl.url], dest: path.join(modsDir, dl.fileName), sha1: dl.sha1, size: dl.size }], (d, t) => onProgress?.('下载整合包模组', 10 + Math.round(((i + d / Math.max(1, t)) / files.length) * 80)), 1, getSettings().mirror)
+          await downloadAll([{ label: dl.fileName, url: dl.url, urls: [dl.url], dest: path.join(modsDir, dl.fileName), sha1: dl.sha1, size: dl.size }], () => onProgress?.(`下载整合包模组 ${i + 1}/${files.length}（${dl.fileName}）`, 5 + Math.round(((i + 1) / files.length) * 85)), 1, getSettings().mirror)
           mods++
         } catch (err) {
           hostLog.warn(`整合包模组下载失败（${f.projectID}/${f.fileID}）：${String(err)}`)
