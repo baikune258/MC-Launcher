@@ -456,6 +456,8 @@ export interface Settings {
   updateMirrorUrls?: string[]
   /** 内测群号覆盖（免打包临时改；默认取 shared/branding.ts 的 QQ_GROUP_NUMBER） */
   qqGroupNumber?: string
+  /** 赞助（爱发电等）主页链接；空 = 未配置，设置页可随时填写保存 */
+  sponsorUrl?: string
   /** CurseForge 官方 API Key（console.curseforge.com 免费申请）；留空走 MCIM 镜像兜底 */
   curseforgeApiKey?: string
   /** 自动安装更新（默认开启）：发现新版本静默下载，启动器关闭时自动安装；关闭则弹窗询问 */
@@ -752,6 +754,7 @@ export const IPC = {
   hostServerLog: 'host-server:log', // (id) => string
   hostServerDelete: 'host-server:delete', // (id) => void
   hostServerCommand: 'host-server:command', // (id, command) => void 服务器控制台命令
+  openExternal: 'shell:open-external', // (url) => void 打开外部链接（仅 http/https）
   certTrustStatus: 'cert:trust-status', // () => boolean 证书是否已受信任
   certTrustInstall: 'cert:trust-install', // () => boolean 一键信任（弹一次 UAC）
   hostServerResume: 'host-server:resume', // () => void

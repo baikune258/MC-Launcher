@@ -29,7 +29,8 @@ import {
   setDownloadFolder,
   setPluginEnabled,
   certTrustStatus,
-  certTrustInstall
+  certTrustInstall,
+  openExternal
 } from '../api'
 import { store, toast } from '../store'
 import AppearanceThemeCard from '../components/AppearanceThemeCard.vue'
@@ -63,6 +64,20 @@ const certTrusted = ref<boolean | null>(null)
 const certTrustBusy = ref(false)
 async function loadCertTrust() {
   try { certTrusted.value = await certTrustStatus() } catch { certTrusted.value = null }
+}
+const sponsorUrl = ref(store.settings?.sponsorUrl || '')
+const sponsorBusy = ref(false)
+function saveSponsorUrl() {
+  const url = sponsorUrl.value.trim()
+  if (!/^https?:\/\//.test(url)) { toast('请填写以 http(s):// 开头的赞助链接', 'error'); return }
+  void save({ sponsorUrl: url })
+  toast('赞助链接已保存', 'success')
+}
+async function onSponsor() {
+  const url = (store.settings?.sponsorUrl || '').trim()
+  if (!url) { toast('请先在上方填写赞助链接（如爱发电主页）', 'error'); return }
+  sponsorBusy.value = true
+  try { await openExternal(url) } catch (e) { toast('打开失败：' + errText(e), 'error') } finally { sponsorBusy.value = false }
 }
 async function onTrustCert() {
   certTrustBusy.value = true
@@ -1125,8 +1140,11 @@ async function onRemovePlugin(p: PluginInfo) {
         </summary>
         <div data-ui="SettingsView:37c9e71b5f27" class="collapse-body">
           <div data-ui="SettingsView:adafc6ff9288" class="upd-row">
-            <span data-ui="SettingsView:3aeed3207223" class="upd-label">当前版本</span>
+            <span data-ui="SettingsView:sponsor02" class="upd-label">赞助链接</span>
+            <input data-ui="SettingsView:sponsor03" class="input mono upd-input" :value="sponsorUrl" placeholder="https://afdian.com/a/你的主页" @change="saveSponsorUrl" @input="sponsorUrl = ($event.target as HTMLInputElement).value" aria-label="赞助链接" />
+            <span data-ui="SettingsView:sponsor04" class="upd-label">当前版本</span>
             <span data-ui="SettingsView:7f2b62d69ce5" class="upd-value">v{{ appVersion }}</span>
+            <button data-ui="SettingsView:sponsor01" class="btn btn-gold btn-sm" :disabled="sponsorBusy" @click="onSponsor">赞助作者 ❤</button>
             <button data-ui="SettingsView:e3f1fccf0c78" class="btn btn-ghost btn-sm" @click="showLicenses = true">第三方许可</button>
             <ThirdPartyNotices v-if="showLicenses" @dismiss="showLicenses = false" />
             <button data-ui="SettingsView:2d10e8cc0926" class="btn btn-ghost btn-sm" :disabled="updateCheckState === 'checking'" @click="onCheckUpdate">
@@ -1824,4 +1842,6 @@ async function onRemovePlugin(p: PluginInfo) {
 }
 .download-accel-row { display:flex; align-items:center; justify-content:space-between; gap:12px; }
 .download-accel-row input[type='checkbox'] { width:16px; height:16px; accent-color:var(--accent); }
+
+.upd-input { flex: 1 1 260px; min-width: 200px; font-size: var(--text-sm); }
 </style>

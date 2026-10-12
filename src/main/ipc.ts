@@ -166,6 +166,10 @@ export function registerIpc(getWin: () => BrowserWindow | null): void {
     return uploadHostServerMod(String(id ?? ''), r.filePaths[0])
   })
   // 在线服务器：打开服务器文件夹（mods / world 等）
+  ipcMain.handle(IPC.openExternal, (_e, url: string) => {
+    if (typeof url === 'string' && /^https?:\/\//.test(url)) return shell.openExternal(url)
+    return undefined
+  })
   ipcMain.handle(IPC.certTrustStatus, () => isCertTrusted())
   ipcMain.handle(IPC.certTrustInstall, () => trustCert())
   ipcMain.handle(IPC.hostServerOpenFolder, (_e, id: string) => {
