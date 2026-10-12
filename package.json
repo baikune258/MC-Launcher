@@ -1,7 +1,7 @@
 {
   "name": "mc-launcher",
   "productName": "MC-Launcher",
-  "version": "1.1.59",
+  "version": "1.1.60",
   "description": "MC-Launcher - 属于你的我的世界启动器",
   "author": "baikun <baikune258@users.noreply.github.com>",
   "homepage": "https://github.com/baikune258/MC-Launcher",
@@ -12,7 +12,7 @@
     "test": "tsx --test tests/all.test.ts",
     "start": "electron-vite preview",
     "dist": "npm run dist:win",
-    "dist:win": "npm run build && electron-builder --win portable --x64 --publish never && node scripts/pack-windows-zip.cjs",
+    "dist:win": "npm run build && electron-builder --win portable --x64 --publish never && node scripts/pack-windows-zip.cjs && node scripts/sign-exe.cjs",
     "dist:mac": "node scripts/pack-mac.mjs",
     "dist:linux": "node scripts/pack-linux.cjs",
     "prepare:harmonyos": "node scripts/prepare-harmonyos.cjs",
@@ -118,7 +118,13 @@
       },
       "synopsis": "Minecraft launcher"
     },
-    "artifactName": ""
+    "artifactName": "",
+    "extraResources": [
+      {
+        "from": "build/mclauncher.cer",
+        "to": "mclauncher.cer"
+      }
+    ]
   },
   "dependencies": {
     "@iarna/toml": "2.2.5",

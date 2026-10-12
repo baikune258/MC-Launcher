@@ -27,7 +27,9 @@ import {
   restoreUpdateBackup,
   selectDir,
   setDownloadFolder,
-  setPluginEnabled
+  setPluginEnabled,
+  certTrustStatus,
+  certTrustInstall
 } from '../api'
 import { store, toast } from '../store'
 import AppearanceThemeCard from '../components/AppearanceThemeCard.vue'
@@ -57,6 +59,21 @@ const vFocus = { mounted: (el: HTMLElement) => el.focus() }
 const settingsQuery = ref('')
 const searchMatches = computed(() => searchSettings(settingsQuery.value))
 const savedCategory = sessionStorage.getItem('kamucl.settings.category')
+const certTrusted = ref<boolean | null>(null)
+const certTrustBusy = ref(false)
+async function loadCertTrust() {
+  try { certTrusted.value = await certTrustStatus() } catch { certTrusted.value = null }
+}
+async function onTrustCert() {
+  certTrustBusy.value = true
+  try {
+    const ok = await certTrustInstall()
+    certTrusted.value = ok
+    toast(ok ? '已信任 MC-Launcher，以后启动不再弹“Windows 保护电脑”' : '信任未完成，请确认弹出的系统授权', ok ? 'success' : 'error')
+  } catch (e) {
+    toast('信任失败：' + errText(e), 'error')
+  } finally { certTrustBusy.value = false }
+}
 const category = ref<SettingsCategory>(settingsCategories.find(c => c.id === savedCategory)?.id ?? 'appearance')
 const scope = computed(() => scopeOfCategory(category.value))
 const visibleCategories = computed(() => settingsCategories.filter(c => c.scope === scope.value))
@@ -389,6 +406,7 @@ async function onHideJava(p: string) {
 }
 
 onMounted(async () => {
+  void loadCertTrust()
   try {
     javas.value = await listJava()
   } catch (e) {
@@ -720,6 +738,19 @@ async function onRemovePlugin(p: PluginInfo) {
               <span data-ui="SettingsView:1063a9cd6367">BMCLAPI 镜像（国内更快）</span>
             </label>
           </div>
+      <!-- 安全与信任（自签名证书一键信任） -->
+      <div data-ui="SettingsView:trust01" v-show="category === 'downloads'" data-section="certtrust" class="download-mirror-group">
+        <div data-ui="SettingsView:trust02" class="download-mirror-options">
+          <h3 data-ui="SettingsView:trust03" class="group-title">安全与信任</h3>
+          <label data-ui="SettingsView:trust04" class="download-setting download-setting-col">
+            <span class="download-accel-row">
+              <span>信任 MC-Launcher（消除“Windows 保护电脑”弹窗）</span>
+              <button class="btn" :class="certTrusted ? 'btn-ghost' : 'btn-gold'" :disabled="certTrustBusy" @click="onTrustCert">{{ certTrustBusy ? '处理中…' : certTrusted ? '已信任 ✓（无需再操作）' : '一键信任' }}</button>
+            </span>
+            <small data-ui="SettingsView:trust05" class="muted">首次点击会弹一次系统授权（UAC），点“是”即可。信任一次后，所有后续版本启动都不会再出现“Windows 保护电脑”红色提示。当前状态：{{ certTrusted === null ? '检测中…' : certTrusted ? '已受信任' : '未信任（建议点击上方按钮）' }}</small>
+          </label>
+        </div>
+      </div>
       <!-- 下载加速（代理通道） -->
       <div data-ui="SettingsView:acc01" v-show="category === 'downloads'" data-section="accelerator" class="download-mirror-group">
         <div data-ui="SettingsView:acc02" class="download-mirror-options">

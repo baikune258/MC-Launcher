@@ -104,6 +104,7 @@ import { registerVoxlinkIpc } from './core/voxlink'
 import { registerTerracottaIpc } from './core/terracotta'
 import { registerFrpIpc, installFrpEventBridge } from './core/frpIpc'
 import { registerHostServerIpc } from './core/hostServerIpc'
+import { isCertTrusted, trustCert } from './core/certTrust'
 import { resumeHostServers, uploadHostServerDatapack, uploadHostServerMod, listHostServers, openHostServerFolder } from './core/hostServer'
 
 function errText(err: unknown): string {
@@ -165,6 +166,8 @@ export function registerIpc(getWin: () => BrowserWindow | null): void {
     return uploadHostServerMod(String(id ?? ''), r.filePaths[0])
   })
   // 在线服务器：打开服务器文件夹（mods / world 等）
+  ipcMain.handle(IPC.certTrustStatus, () => isCertTrusted())
+  ipcMain.handle(IPC.certTrustInstall, () => trustCert())
   ipcMain.handle(IPC.hostServerOpenFolder, (_e, id: string) => {
     const dir = openHostServerFolder(String(id ?? ''))
     void shell.openPath(dir).then((error) => { if (error) dialog.showErrorBox('无法打开服务器文件夹', error) })

@@ -475,6 +475,8 @@ export const hostServerStatus = (id: string) => invoke<HostServerStatus>(IPC.hos
 export const hostServerLog = (id: string) => invoke<string>(IPC.hostServerLog, id)
 export const deleteHostServer = (id: string) => invoke<void>(IPC.hostServerDelete, id)
 export const sendHostCommand = (id: string, command: string) => invoke<void>(IPC.hostServerCommand, id, command)
+export const certTrustStatus = () => invoke<boolean>(IPC.certTrustStatus)
+export const certTrustInstall = () => invoke<boolean>(IPC.certTrustInstall)
 export const resumeHostServers = () => invoke<void>(IPC.hostServerResume)
 export const uploadHostServerDatapack = (id: string) => invoke<string | null>(IPC.hostServerUploadDatapack, id)
 export const uploadHostServerMod = (id: string) => invoke<string | null>(IPC.hostServerUploadMod, id)
