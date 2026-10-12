@@ -153,8 +153,10 @@ export function cleanupUpdateRemnants(): void {
       }
     }
   } catch { /* 目录不可读则跳过 */ }
-  // 2. MC-Launcher-update 残留下载包与空目录（含旧命名 KAMUCL-update）；有活动事务时保留
+  // 2. 更新暂存区：新命名 MC-Launcher\update（exe 同目录 MC-Launcher 子目录）与旧命名
+  //    MC-Launcher-update、KAMUCL-update 全部清理，不留任何历史版本安装包；有活动事务时保留
   if (!hasActiveTransaction) {
+    try { fs.rmSync(updateDirOf(exe), { recursive: true, force: true }) } catch { /* 跳过 */ }
     try { fs.rmSync(path.join(base, 'MC-Launcher-update'), { recursive: true, force: true }) } catch { /* 跳过 */ }
     try { fs.rmSync(path.join(base, 'KAMUCL-update'), { recursive: true, force: true }) } catch { /* 跳过 */ }
   }

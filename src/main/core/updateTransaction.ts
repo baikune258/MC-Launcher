@@ -153,9 +153,16 @@ try {
           try {
             if ((Hash-File $newExe) -eq $expected) {
               Remove-Item -LiteralPath $newExe -Force -ErrorAction SilentlyContinue
-              # 更新包已应用，顺带清空暂存子目录（残留由下次启动兜底清理）
-              $pkgDir = Split-Path -Parent $newExe
-              if ((Test-Path -LiteralPath $pkgDir) -and -not (Get-ChildItem -LiteralPath $pkgDir -Force | Select-Object -First 1)) { Remove-Item -LiteralPath $pkgDir -Force -Recurse -ErrorAction SilentlyContinue }
+              # 更新包已应用：清空整个暂存区（新命名 MC-Launcher\\update 与旧命名目录），
+              # 不留任何历史版本安装包，防止「老版本残留」
+              $launcherRoot = Split-Path -Parent $oldExe
+              $stagingDirs = @((Join-Path $launcherRoot 'MC-Launcher\\update'), (Join-Path $launcherRoot 'MC-Launcher-update'), (Join-Path $launcherRoot 'KAMUCL-update'))
+              foreach ($sd in $stagingDirs) { if (Test-Path -LiteralPath $sd) { Remove-Item -LiteralPath $sd -Force -Recurse -ErrorAction SilentlyContinue } }
+              # 备份区只保留本次更新生成的最新备份（回退功能仍可用），
+              # 删除更早的全部备份，不留老版本残留
+              if (Test-Path -LiteralPath $backupDir) {
+                Get-ChildItem -LiteralPath $backupDir -Force -ErrorAction SilentlyContinue | Where-Object { $_.FullName -ne $backup } | Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
+              }
             }
           } catch { Log 'Staged package cleanup deferred' }
         }
