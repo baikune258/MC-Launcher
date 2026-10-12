@@ -720,6 +720,20 @@ async function onRemovePlugin(p: PluginInfo) {
               <span data-ui="SettingsView:1063a9cd6367">BMCLAPI 镜像（国内更快）</span>
             </label>
           </div>
+      <!-- 下载加速（代理通道） -->
+      <div data-ui="SettingsView:acc01" v-show="category === 'downloads'" data-section="accelerator" class="download-mirror-group">
+        <div data-ui="SettingsView:acc02" class="download-mirror-options">
+          <h3 data-ui="SettingsView:acc03" class="group-title">下载加速（代理通道）</h3>
+          <label data-ui="SettingsView:acc04" class="download-setting download-setting-col">
+            <span class="download-accel-row">
+              <span>开启下载加速</span>
+              <input data-ui="SettingsView:acc05" type="checkbox" :checked="!!store.settings.acceleratorEnabled" @change="save({ acceleratorEnabled: !!($event.target as HTMLInputElement).checked })" />
+            </span>
+            <input data-ui="SettingsView:acc06" class="input mono" type="text" spellcheck="false" :value="store.settings.acceleratorProxy ?? ''" @change="save({ acceleratorProxy: ($event.target as HTMLInputElement).value.trim() })" placeholder="http://127.0.0.1:7890" />
+            <small data-ui="SettingsView:acc07" class="muted">开启后所有下载（游戏版本 / 整合包 / 在线服务器 / 更新）走下面的代理地址，配合网络加速器或代理软件可解决 Modrinth 等国外源慢的问题。仅支持 http/https 代理（如 http://127.0.0.1:7890）；加速器未运行时下载会报错，关闭开关即可恢复直连。</small>
+          </label>
+        </div>
+      </div>
           <label data-ui="SettingsView:a1b2c3d4e5f6" class="download-setting download-setting-col">微软登录应用（Client ID）
             <input data-ui="SettingsView:b2c3d4e5f6a7" class="input" type="text" spellcheck="false" :value="store.settings.msClientId" @change="save({ msClientId: ($event.target as HTMLInputElement).value.trim() })" placeholder="留空使用内置默认应用" />
             <small data-ui="SettingsView:c3d4e5f6a7b8" class="muted">在微软 Azure 门户注册自己的应用（名称与图标会显示在登录授权页），把“应用程序(客户端) ID”粘贴到这里。留空则使用内置默认应用。</small>
@@ -1777,4 +1791,6 @@ async function onRemovePlugin(p: PluginInfo) {
 .launch-option-field .input {
   width: 100%;
 }
+.download-accel-row { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.download-accel-row input[type='checkbox'] { width:16px; height:16px; accent-color:var(--accent); }
 </style>

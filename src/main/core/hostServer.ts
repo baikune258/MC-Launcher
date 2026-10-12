@@ -378,12 +378,13 @@ export function hostServerLog(id: string, lines = 200): string {
   return readLogTail(id, lines)
 }
 
-export function deleteHostServer(id: string): void {
+export async function deleteHostServer(id: string): Promise<void> {
   const record = findRecord(id)
   if (!record) return
   if (record.pid && processAlive(record.pid)) {
-    // 删除前先停服
-    void stopHostServer(id)
+    // 删除前先停服并等待进程完全退出，否则旧进程仍占用端口，
+    // 用户紧接着用同一端口重建服务器时会启动失败
+    await stopHostServer(id)
   }
   const list = readHostServers().filter((r) => r.id !== id)
   writeHostServers(list)

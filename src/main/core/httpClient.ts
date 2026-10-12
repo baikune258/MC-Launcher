@@ -9,8 +9,9 @@
  * 会被 30s 默认值误判为死链而反复中止（表现为「下载总是被取消」），因此下载路径显式
  * 传更长的 bodyTimeoutMs，其余调用方（frp 等）行为不变。
  */
-import { Agent, fetch as undiciFetch } from 'undici'
+import { Agent, ProxyAgent, fetch as undiciFetch } from 'undici'
 import { waitIfTaskPaused } from './tasks'
+import { getSettings } from './settings'
 
 /** 共享 Agent 与按 bodyTimeout 派生 Agent 的公共参数；调整时两者保持一致。 */
 const AGENT_BASE_OPTIONS = {
@@ -37,12 +38,37 @@ function agentWithBodyTimeout(bodyTimeoutMs: number): Agent {
   return agent
 }
 
+let acceleratorAgent: ProxyAgent | null = null
+let acceleratorUrl = ''
+/** 下载加速：设置里开启加速且填了 http/https 代理时，全部下载/请求走该代理（Modrinth 等国外源提速）。
+ *  仅支持 http/https 代理协议；代理不可用时由 undici 连接失败自然报错，不静默回退。 */
+function acceleratorDispatcher(): ProxyAgent | undefined {
+  try {
+    const s = getSettings()
+    if (!s.acceleratorEnabled) return undefined
+    const url = (s.acceleratorProxy ?? '').trim()
+    if (!/^https?:\/\//i.test(url)) return undefined
+    if (url !== acceleratorUrl) {
+      void acceleratorAgent?.close?.()
+      acceleratorAgent = new ProxyAgent(url)
+      acceleratorUrl = url
+    }
+    return acceleratorAgent
+  } catch { return undefined }
+}
+
 /** 与全局 fetch 同签名；signal/headers/redirect 等透传，dispatcher 固定共享 h2 Agent。
  *  bodyTimeoutMs 为可选增量参数：不传时行为与旧版完全一致。 */
 export function httpFetch(
   url: string,
   init: { signal?: AbortSignal; headers?: Record<string, string>; redirect?: 'follow' | 'manual' | 'error'; method?: string; body?: string; bodyTimeoutMs?: number; separateConnection?: boolean; systemProxy?: boolean } = {}
 ): Promise<Response> {
+  // 下载加速（用户显式配置的代理通道）优先于系统代理：开了加速就走代理
+  const accel = acceleratorDispatcher()
+  if (accel) {
+    const { systemProxy, bodyTimeoutMs, separateConnection, ...rest } = init
+    return undiciFetch(url, { ...rest, dispatcher: accel }) as unknown as Promise<Response>
+  }
   // Runtime downloads must use the same OS proxy/PAC and certificate store as
   // the desktop app. Node fetch/undici do not inherit macOS system proxy settings.
   if (init.systemProxy && process.versions.electron) {
@@ -70,4 +96,5 @@ export function httpFetch(
 /** 进程退出时关闭连接池（Electron 退出由主进程生命周期管理，这里仅防御性提供）。 */
 export async function closeHttpClient(): Promise<void> {
   await Promise.all([sharedAgent.close(), rangeAgent.close(), ...[...bodyTimeoutAgents.values()].map((agent) => agent.close())])
+  if (acceleratorAgent) { try { await acceleratorAgent.close() } catch { /* 忽略 */ } acceleratorAgent = null }
 }

@@ -41,6 +41,6 @@ export function registerHostServerIpc(ipcMain: IpcMain, getWin: () => BrowserWin
   ipcMain.handle(HOST_SERVER_IPC.stop, (_e, id: string): Promise<void> => stopHostServer(String(id)))
   ipcMain.handle(HOST_SERVER_IPC.status, (_e, id: string): Promise<HostServerStatus> => hostServerStatus(String(id)))
   ipcMain.handle(HOST_SERVER_IPC.log, (_e, id: string): string => hostServerLog(String(id)))
-  ipcMain.handle(HOST_SERVER_IPC.delete, (_e, id: string): void => deleteHostServer(String(id)))
+  ipcMain.handle(HOST_SERVER_IPC.delete, async (_e, id: string): Promise<void> => deleteHostServer(String(id)))
   ipcMain.handle(HOST_SERVER_IPC.resume, (): void => resumeHostServers())
 }

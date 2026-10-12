@@ -446,6 +446,10 @@ export interface Settings {
   skipUpdateVersion?: string
   /** 更新下载源：auto=直连优先镜像兜底；direct=仅 GitHub 直连；mirror=仅自定义镜像 */
   updateSource?: 'auto' | 'direct' | 'mirror'
+  /** 下载加速（代理通道）：开启后所有下载走 acceleratorProxy 指定的 http/https 代理 */
+  acceleratorEnabled?: boolean
+  /** 下载加速代理地址，如 http://127.0.0.1:7890 */
+  acceleratorProxy?: string
   /** 自定义镜像前缀（拼接在 GitHub 文件 URL 前，如 https://ghproxy.net/） */
   updateMirrorUrl?: string
   /** Additional update mirrors; the old singular field remains readable. */
