@@ -12,11 +12,13 @@ import { tunnelIdentity } from './frpManager'
 import {
 
   loadFrpConfig,
+  saveFrpConfig,
   type FrpEvent,
   type FrpConfig,
   type FrpState
 } from './frp'
 import { fetchFrpNodes, createFrpTunnel, getRunnableFrpTunnel, type FrpCreateTunnel } from './frpNodes'
+import { ensureFrpcInstalled } from './frp'
 
 export interface FrpStartPayload {
   id?: string
@@ -35,6 +37,8 @@ export const FRP_IPC = {
 } as const
 
 export function registerFrpIpc(ipcMain: IpcMain): void {
+  // 启动器启动即后台预装樱花穿透官方客户端，点击「樱花公开」时无需再等下载
+  void ensureFrpcInstalled().catch(() => {})
   ipcMain.handle('frp:delete-tunnel', async (_event, payload: { id?: string; confirmed?: boolean }) => {
     if (!payload?.id || payload.confirmed !== true) throw new Error('请先确认删除该隧道')
     return frpManager.remove(String(payload.id))
@@ -55,7 +59,22 @@ export function registerFrpIpc(ipcMain: IpcMain): void {
     await frpManager.stop(String(payload.id))
     return frpManager.list()
   })
-  ipcMain.handle(FRP_IPC.status, () => frpManager.list())
+  ipcMain.handle(FRP_IPC.status, () => {
+    const list = frpManager.list()
+    if (!list.accessKey) {
+      const saved = loadFrpConfig()?.accessKey
+      if (saved) list.accessKey = saved
+    }
+    return list
+  })
+
+  // 保存樱花穿透访问密钥（持久化到安装目录配置，之后无需再次输入）
+  ipcMain.handle('frp:save-key', (_e, payload: { accessKey?: string }) => {
+    const key = String(payload?.accessKey ?? '').trim()
+    if (!key) throw new Error('访问密钥不能为空')
+    saveFrpConfig({ accessKey: key, tunnelId: '', localPort: 0 })
+    return { ok: true, accessKey: key }
+  })
 
   // 节点列表（natfrp v4 公开 API）。accessKey 缺省时回退持久化配置里的密钥。
   ipcMain.handle(FRP_IPC.nodes, async (_event, payload: { accessKey?: string; refresh?: boolean } | undefined) => {

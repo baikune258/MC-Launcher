@@ -242,17 +242,23 @@ async function onHostFrp(s: HostServerRecord) {
     }
     let t = frpTunnelOf(status.tunnels || [], s.port)
     if (!t) {
-      const nodesRes = await kamucl.invoke('frp:nodes', { accessKey: key, refresh: true }) as { nodes?: Array<{ id: number; free: boolean; online: boolean; canCreate: boolean }> }
+      const nodesRes = await kamucl.invoke('frp:nodes', { accessKey: key }) as { nodes?: Array<{ id: number; free: boolean; online: boolean; canCreate: boolean }> }
       const nodes = nodesRes.nodes || []
       const node = nodes.find((n) => n.free && n.online && n.canCreate) || nodes.find((n) => n.online && n.canCreate)
       if (!node) throw new Error('没有可用节点，请稍后再试或到「联机」页手动创建')
       await kamucl.invoke('frp:create-tunnel', { accessKey: key, tunnel: { name: `MC-Launcher-${s.name}-${s.port}`, node: node.id, localPort: s.port } })
-      const after = await kamucl.invoke('frp:nodes', { accessKey: key, refresh: true }) as { tunnels?: Array<{ id: string; config?: { localPort?: number }; name?: string }> }
+      const after = await kamucl.invoke('frp:nodes', { accessKey: key }) as { tunnels?: Array<{ id: string; config?: { localPort?: number }; name?: string }> }
       t = (after.tunnels || []).find((x) => x.config?.localPort === s.port)
     }
     if (!t?.id) throw new Error('隧道创建后未找到，请到「联机」页检查')
     await kamucl.invoke('frp:start', { id: t.id })
     toast('已启动樱花穿透，正在连接公网…', 'info')
+    // 快速轮询拿公网地址（frpc 建立隧道通常 1~3 秒）
+    for (let i = 0; i < 6; i++) {
+      await new Promise((r) => setTimeout(r, 700))
+      await refreshFrpForServers()
+      if (frpStateOf(s.id).remoteAddress) break
+    }
   } catch (e) {
     st.error = errText(e)
     toast('樱花穿透失败：' + st.error, 'error')
@@ -289,6 +295,7 @@ async function saveFrpKey() {
   if (!key) { toast('请粘贴访问密钥', 'error'); return }
   try {
     await kamucl.invoke('frp:nodes', { accessKey: key, refresh: true })
+    await kamucl.invoke('frp:save-key', { accessKey: key })
     toast('密钥已保存，正在公开服务器…', 'info')
     frpKeyModal.value = false
     const target = hostServers.value.find((x) => x.id === frpKeyTarget.value)
