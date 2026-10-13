@@ -200,11 +200,117 @@ const hostStateClass = (s: HostServerRecord) => {
 }
 const onlineCount = computed(() => hostServers.value.filter((s) => hostStatus[s.id]?.online).length)
 
+// ===== 一键樱花穿透（公网公开服务器） =====
+interface FrpServerState { busy: boolean; status: string; remoteAddress: string | null; error: string }
+const frpByServer = reactive<Record<string, FrpServerState>>({})
+const frpKeyModal = ref(false)
+const frpKeyTarget = ref('')
+const frpKeyInput = ref('')
+function frpStateOf(id: string): FrpServerState { return (frpByServer[id] ??= { busy: false, status: 'idle', remoteAddress: null, error: '' }) }
+const frpActive = (s: HostServerRecord) => frpStateOf(s.id).status === 'running' || frpStateOf(s.id).status === 'starting'
+function frpTunnelOf(tunnels: Array<{ config?: { localPort?: number }; status?: string; remoteAddress?: string | null; message?: string }>, port: number) {
+  return (tunnels || []).find((x) => x.config?.localPort === port)
+}
+async function refreshFrpForServers() {
+  try {
+    const status = await kamucl.invoke('frp:status') as { tunnels: Array<{ config?: { localPort?: number }; status?: string; remoteAddress?: string | null; message?: string }> }
+    for (const s of hostServers.value) {
+      const t = frpTunnelOf(status.tunnels || [], s.port)
+      const st = frpStateOf(s.id)
+      if (t) {
+        st.status = t.status || 'idle'
+        st.remoteAddress = t.remoteAddress || null
+        st.error = (t.status && !['running', 'starting', 'idle', 'stopped'].includes(t.status)) ? (t.message || '连接异常') : ''
+      } else {
+        st.status = 'idle'; st.remoteAddress = null; st.error = ''
+      }
+    }
+  } catch { /* 忽略 */ }
+}
+async function onHostFrp(s: HostServerRecord) {
+  const st = frpStateOf(s.id)
+  if (st.busy) return
+  st.busy = true; st.error = ''
+  try {
+    const status = await kamucl.invoke('frp:status') as { accessKey: string; tunnels: Array<{ id: string; config?: { localPort?: number }; name?: string; status?: string; remoteAddress?: string | null; message?: string }> }
+    let key = status.accessKey
+    if (!key) {
+      frpKeyTarget.value = s.id
+      frpKeyInput.value = ''
+      frpKeyModal.value = true
+      return
+    }
+    let t = frpTunnelOf(status.tunnels || [], s.port)
+    if (!t) {
+      const nodesRes = await kamucl.invoke('frp:nodes', { accessKey: key, refresh: true }) as { nodes?: Array<{ id: number; free: boolean; online: boolean; canCreate: boolean }> }
+      const nodes = nodesRes.nodes || []
+      const node = nodes.find((n) => n.free && n.online && n.canCreate) || nodes.find((n) => n.online && n.canCreate)
+      if (!node) throw new Error('没有可用节点，请稍后再试或到「联机」页手动创建')
+      await kamucl.invoke('frp:create-tunnel', { accessKey: key, tunnel: { name: `MC-Launcher-${s.name}-${s.port}`, node: node.id, localPort: s.port } })
+      const after = await kamucl.invoke('frp:nodes', { accessKey: key, refresh: true }) as { tunnels?: Array<{ id: string; config?: { localPort?: number }; name?: string }> }
+      t = (after.tunnels || []).find((x) => x.config?.localPort === s.port)
+    }
+    if (!t?.id) throw new Error('隧道创建后未找到，请到「联机」页检查')
+    await kamucl.invoke('frp:start', { id: t.id })
+    toast('已启动樱花穿透，正在连接公网…', 'info')
+  } catch (e) {
+    st.error = errText(e)
+    toast('樱花穿透失败：' + st.error, 'error')
+  } finally {
+    st.busy = false
+    await refreshFrpForServers()
+  }
+}
+async function onHostFrpStop(s: HostServerRecord) {
+  const st = frpStateOf(s.id)
+  if (st.busy) return
+  st.busy = true
+  try {
+    const status = await kamucl.invoke('frp:status') as { tunnels: Array<{ id: string; config?: { localPort?: number } }> }
+    const t = frpTunnelOf(status.tunnels || [], s.port)
+    if (t?.id) await kamucl.invoke('frp:stop', { id: t.id })
+    st.status = 'stopped'; st.remoteAddress = null; st.error = ''
+    toast('已停止樱花穿透', 'success')
+  } catch (e) {
+    toast('停止穿透失败：' + errText(e), 'error')
+  } finally {
+    st.busy = false
+    await refreshFrpForServers()
+  }
+}
+async function copyFrpAddress(s: HostServerRecord) {
+  const addr = frpStateOf(s.id).remoteAddress
+  if (!addr) return
+  try { toast(await copyText(addr) ? '公网地址已复制，发给好友即可全网联机' : '复制失败', 'info') }
+  catch (e) { toast('复制失败：' + errText(e), 'error') }
+}
+async function saveFrpKey() {
+  const key = frpKeyInput.value.trim()
+  if (!key) { toast('请粘贴访问密钥', 'error'); return }
+  try {
+    await kamucl.invoke('frp:nodes', { accessKey: key, refresh: true })
+    toast('密钥已保存，正在公开服务器…', 'info')
+    frpKeyModal.value = false
+    const target = hostServers.value.find((x) => x.id === frpKeyTarget.value)
+    if (target) await onHostFrp(target)
+  } catch (e) {
+    toast('密钥校验失败：' + errText(e), 'error')
+  }
+}
+let offFrpEvent: (() => void) | undefined
+let frpPollTimer: ReturnType<typeof setInterval> | undefined
+
 onMounted(() => {
   void loadHostServers()
   pollTimer = setInterval(() => { void refreshHostStatuses() }, 8000)
+  offFrpEvent = kamucl.on('frp:event', () => { void refreshFrpForServers() })
+  frpPollTimer = setInterval(() => { void refreshFrpForServers() }, 6000)
 })
-onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
+onBeforeUnmount(() => {
+  if (pollTimer) clearInterval(pollTimer)
+  if (frpPollTimer) clearInterval(frpPollTimer)
+  offFrpEvent?.()
+})
 </script>
 
 <template>
@@ -235,6 +341,7 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
             <button v-else class="btn btn-ghost btn-sm" :disabled="hostUploadBusy === s.id" @click="onHostUploadMod(s.id)">上传模组</button>
             <button class="btn btn-ghost btn-sm" @click="onHostOpenFolder(s.id)">打开文件夹</button>
             <button class="btn btn-ghost btn-sm" :disabled="hostBusy === s.id" @click="copyHostAddress(s.id)">复制地址</button>
+            <button class="btn btn-gold btn-sm host-frp-btn" :class="{ 'frp-stop': frpActive(s) }" :disabled="frpStateOf(s.id).busy || hostBusy === s.id" @click="frpActive(s) ? onHostFrpStop(s) : onHostFrp(s)">{{ frpStateOf(s.id).busy ? '穿透中…' : (frpActive(s) ? '停止穿透' : '樱花公开') }}</button>
             <button v-if="!hostStatus[s.id]?.running" class="btn btn-gold btn-sm" :disabled="hostBusy === s.id" @click="onHostStart(s.id)">启动</button>
             <button v-else class="btn btn-danger btn-sm" :disabled="hostBusy === s.id" @click="onHostStop(s.id)">停止</button>
             <button class="btn btn-ghost btn-sm" @click="onHostConsoleOpen(s.id)">控制台</button>
@@ -242,7 +349,9 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
             <button class="btn btn-ghost btn-sm host-del" @click="onHostDelete(s.id)">删除</button>
           </div>
         </div>
-        <div v-if="hostStatus[s.id]?.address" class="host-address">加入地址：<code>{{ hostStatus[s.id]?.address }}</code><span class="muted">（同一网络的好友可加入；公网联机可在「联机」页配置樱花穿透）</span></div>
+        <div v-if="hostStatus[s.id]?.address" class="host-address">局域网加入地址：<code>{{ hostStatus[s.id]?.address }}</code><span class="muted">（同一网络的好友可加入）</span></div>
+        <div v-if="frpActive(s) && frpStateOf(s.id).remoteAddress" class="host-address host-frp-address">公网加入地址：<code>{{ frpStateOf(s.id).remoteAddress }}</code><button class="btn btn-ghost btn-sm" :disabled="frpStateOf(s.id).busy" @click="copyFrpAddress(s)">复制</button><span class="muted">（发给好友即可全网联机）</span></div>
+        <p v-if="frpStateOf(s.id).error" class="host-frp-error">{{ frpStateOf(s.id).error }}</p>
         <p v-if="hostStatus[s.id]?.online && hostStatus[s.id]?.players" class="host-players muted">当前在线 {{ hostStatus[s.id]?.players }} 人</p>
         <p class="muted host-type-hint">{{ hostTypeHint(s) }}</p>
         <pre v-if="hostLogOpen[s.id]" class="host-log">{{ hostStatus[s.id]?.logTail || '暂无日志' }}</pre>
@@ -301,6 +410,19 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
         </div>
       </div>
     </Teleport>
+    <Teleport to="body">
+      <div v-if="frpKeyModal" class="modal-mask connection-modal" @pointerdown.self="frpKeyModal = false">
+        <div class="modal" role="dialog" aria-modal="true" aria-label="填写樱花穿透访问密钥">
+          <h3 class="modal-title">樱花穿透访问密钥</h3>
+          <p class="connection-muted">首次「樱花公开」需要访问密钥：登录 <code>natfrp.com</code> → 用户信息页复制访问密钥粘贴到下面，之后自动记住，可直接一键公开。</p>
+          <input v-model="frpKeyInput" class="input" type="password" autocomplete="off" spellcheck="false" placeholder="粘贴 natfrp.com 的访问密钥" @keydown.enter.prevent="saveFrpKey()" />
+          <div class="modal-actions">
+            <button class="btn btn-ghost" @click="frpKeyModal = false">取消</button>
+            <button class="btn btn-gold" :disabled="!frpKeyInput.trim()" @click="saveFrpKey()">保存并公开</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -326,6 +448,10 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
 .host-meta { font-size:12px; }
 .host-card-actions { display:flex; gap:8px; flex-wrap:wrap; }
 .host-del { color:var(--danger); }
+.host-frp-btn.frp-stop { background:var(--danger); border-color:var(--danger); color:#fff; }
+.host-frp-address { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.host-frp-address code { background:var(--accent-soft, #1e3a2f); color:var(--accent); }
+.host-frp-error { margin:6px 0 0; font-size:12px; color:var(--danger); }
 .host-address { margin:10px 0 0; font-size:13px; }
 .host-address code { padding:2px 8px; border-radius:6px; background:var(--hover); font-size:13px; }
 .host-players { margin:4px 0 0; font-size:12px; }
