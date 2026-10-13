@@ -218,6 +218,24 @@ async function main() {
   if (publicRelease.id !== release.id || publicRelease.draft || publicRelease.tag_name !== tag || publicRelease.target_commitish !== commit) throw new Error('公开 Release 与已验证标签或 master 提交不一致')
   if (await taggedCommit(token) !== commit) throw new Error('公开版本标签未指向已验证 master 提交')
   console.log(`\n全部附件大小与 SHA256 已核对，发布完成：https://github.com/${REPO}/releases/tag/${tag}`)
+
+  // 同步仓库根 update.json（备用更新通道）。Windows 更新资产固定纯名 MC-Launcher.exe；
+  // 历史 ≤1.1.41 旧版按其二进制内的兼容名（MC-Launcher-<版本>.exe）由 fetchRawUpdate 读取本文件兜底。
+  if (options.platform === 'windows') {
+    const updateJson = {
+      latest: version,
+      assetName: 'MC-Launcher.exe',
+      assetUrl: `https://github.com/${REPO}/releases/download/v${version}/MC-Launcher.exe`,
+      publishedAt: publicRelease.published_at ?? new Date().toISOString(),
+      body: body.trim(),
+      sha256SumsUrl: `https://github.com/${REPO}/releases/download/v${version}/SHA256SUMS.txt`
+    }
+    fs.writeFileSync(path.join(root, 'update.json'), JSON.stringify(updateJson, null, 2) + '\n', 'utf-8')
+    execFileSync('git', ['add', 'update.json'], { cwd: root, stdio: 'inherit' })
+    execFileSync('git', ['commit', '-m', `update.json: 指向 v${version}`], { cwd: root, stdio: 'inherit' })
+    execFileSync('git', ['push', 'baikun', 'main'], { cwd: root, stdio: 'inherit' })
+    console.log(`✓ 仓库根 update.json 已同步至 v${version}`)
+  }
 }
 
 main().catch((e) => {

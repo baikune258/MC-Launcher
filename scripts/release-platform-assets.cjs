@@ -31,7 +31,10 @@ function productAssetNames(version, platform = 'all') {
   assert(typeof version === 'string' && /^\d+\.\d+\.\d+$/.test(version), 'Release version must be a numeric triplet')
   platformValue(platform)
   const prefix = `MC-Launcher-${version}`
-  const windows = [`${prefix}.exe`, `${prefix}-windows-x64.zip`, `${prefix}-windows-x64-unpacked.zip`]
+  // Windows 更新资产必须包含纯名 MC-Launcher.exe（更新逻辑按此精确匹配并校验，
+  // 见 src/shared/platform.ts updateArtifactName / updateTrust.ts trustedUpdateRelease）；
+  // 带版本号的 MC-Launcher-<版本>.exe 保留为 legacy 资产，供 ≤1.1.41 旧版备用通道使用。
+  const windows = [`MC-Launcher.exe`, `${prefix}.exe`, `${prefix}-windows-x64.zip`, `${prefix}-windows-x64-unpacked.zip`]
   const mac = ['arm64', 'x64'].flatMap(arch => ['dmg', 'zip'].map(ext => `${prefix}-mac-${arch}.${ext}`))
   const linux = ['x64', 'arm64'].flatMap(arch => ['AppImage', 'deb', 'tar.gz'].map(ext => `${prefix}-linux-${arch}.${ext}`))
   return platform === 'windows' ? windows : [...windows, ...mac, ...(platform === 'desktop' ? linux : [])]
@@ -40,7 +43,7 @@ function productAssetNames(version, platform = 'all') {
 function releaseAssetNames(version, platform = 'all') {
   const products = productAssetNames(version, platform)
   // Preserve the legacy all-platform order: Windows, source, Mac, handoff.
-  return [...products.slice(0, 3), `MC-Launcher-${version}-source.zip`, ...products.slice(3), `MC-Launcher-${version}-handoff.zip`]
+  return [...products.slice(0, 4), `MC-Launcher-${version}-source.zip`, ...products.slice(4), `MC-Launcher-${version}-handoff.zip`]
 }
 
 function assertUniqueAssetNames(names) {
@@ -52,7 +55,7 @@ function assertRemotePlatformScope(assets, version, platform) {
   platformValue(platform)
   if (platform !== 'windows') return
   assert(Array.isArray(assets), 'Remote release asset list required for Windows scope verification')
-  const deferredMac = new Set(productAssetNames(version, 'all').slice(3))
+  const deferredMac = new Set(productAssetNames(version, 'all').slice(productAssetNames(version, 'windows').length))
   if (assets.some(asset => deferredMac.has(asset?.name))) throw Error('Windows-only release contains deferred Mac assets; preserve remote assets and existing release visibility, stop this publication')
 }
 
