@@ -1,8 +1,8 @@
 {
-  "latest": "1.1.64",
+  "latest": "1.1.65",
   "assetName": "MC-Launcher.exe",
-  "assetUrl": "https://github.com/baikune258/MC-Launcher/releases/download/v1.1.64/MC-Launcher.exe",
-  "publishedAt": "2026-10-13T00:53:56Z",
-  "body": "MC-Launcher v1.1.64\n2026-10-13 08:20（UTC+8）\n\n- 新增首页赞助入口（爱发电）\n- 内网穿透（FRP）优化",
-  "sha256SumsUrl": "https://github.com/baikune258/MC-Launcher/releases/download/v1.1.64/SHA256SUMS.txt"
+  "assetUrl": "https://github.com/baikune258/MC-Launcher/releases/download/v1.1.65/MC-Launcher.exe",
+  "publishedAt": "2026-10-13T03:19:17Z",
+  "body": "MC-Launcher v1.1.65\n2026-10-13 09:50（UTC+8）\n\n- 在线服务器新增「樱花公开」：一键樱花穿透，自动创建隧道并显示公网地址\n- 修复了一些BUG或问题",
+  "sha256SumsUrl": "https://github.com/baikune258/MC-Launcher/releases/download/v1.1.65/SHA256SUMS.txt"
 }
