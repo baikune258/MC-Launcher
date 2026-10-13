@@ -1,8 +1,8 @@
 {
-  "latest": "1.1.65",
+  "latest": "1.1.66",
   "assetName": "MC-Launcher.exe",
-  "assetUrl": "https://github.com/baikune258/MC-Launcher/releases/download/v1.1.65/MC-Launcher.exe",
-  "publishedAt": "2026-10-13T03:19:17Z",
-  "body": "MC-Launcher v1.1.65\n2026-10-13 09:50（UTC+8）\n\n- 在线服务器新增「樱花公开」：一键樱花穿透，自动创建隧道并显示公网地址\n- 修复了一些BUG或问题",
-  "sha256SumsUrl": "https://github.com/baikune258/MC-Launcher/releases/download/v1.1.65/SHA256SUMS.txt"
+  "assetUrl": "https://github.com/baikune258/MC-Launcher/releases/download/v1.1.66/MC-Launcher.exe",
+  "publishedAt": "2026-10-13T06:29:36Z",
+  "body": "MC-Launcher v1.1.66\n2026-10-13 11:50（UTC+8）\n\n- 樱花公开：访问密钥保存后无需再次输入，公网地址返回更快\n- 修复了一些BUG或问题",
+  "sha256SumsUrl": "https://github.com/baikune258/MC-Launcher/releases/download/v1.1.66/SHA256SUMS.txt"
 }
