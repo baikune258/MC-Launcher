@@ -8,6 +8,7 @@ export interface UpdateNote {
 
 /** 按版本倒序；latest 为当前版本 */
 export const updateNotes: UpdateNote[] = [
+  {"version":"1.1.69","date":"2026-10-13 16:10","changes":["修复了一些BUG或问题"]},
   {"version":"1.1.68","date":"2026-10-13 15:30","changes":["修复了一些BUG或问题"]},
   {"version":"1.1.67","date":"2026-10-13 14:40","changes":["修复了一些BUG或问题"]},
   {"version":"1.1.66","date":"2026-10-13 11:50","changes":["樱花公开：访问密钥保存后无需再次输入，公网地址返回更快","修复了一些BUG或问题"]},

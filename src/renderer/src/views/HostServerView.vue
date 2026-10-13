@@ -151,8 +151,17 @@ async function onHostDelete(id: string) {
 }
 async function copyHostAddress(id: string) {
   const st = hostStatus[id]
+  // 已公开穿透时优先复制公网地址（好友可直接全网加入），否则复制局域网地址
+  const frp = frpStateOf(id).remoteAddress
+  if (frp) { try { toast(await copyText(frp) ? '公网地址已复制，发给好友即可全网联机' : '复制失败', 'info') } catch (e) { toast('复制失败：' + errText(e), 'error') } return }
   if (!st?.address) return
-  try { toast(await copyText(st.address) ? '地址已复制，发给好友即可加入（同一网络）' : '复制失败', 'info') }
+  try { toast(await copyText(st.address) ? '局域网地址已复制，发给同一网络的好友' : '复制失败', 'info') }
+  catch (e) { toast('复制失败：' + errText(e), 'error') }
+}
+async function copyLocalAddress(id: string) {
+  const st = hostStatus[id]
+  if (!st?.address) return
+  try { toast(await copyText(st.address) ? '局域网地址已复制，发给同一网络的好友' : '复制失败', 'info') }
   catch (e) { toast('复制失败：' + errText(e), 'error') }
 }
 async function onHostUploadDatapack(id: string) {
@@ -372,7 +381,7 @@ onBeforeUnmount(() => {
             <button class="btn btn-ghost btn-sm host-del" @click="onHostDelete(s.id)">删除</button>
           </div>
         </div>
-        <div v-if="hostStatus[s.id]?.address" class="host-address">局域网加入地址：<code>{{ hostStatus[s.id]?.address }}</code><span class="muted">（同一网络的好友可加入）</span></div>
+        <div v-if="hostStatus[s.id]?.address" class="host-address">局域网加入地址：<code>{{ hostStatus[s.id]?.address }}</code><button class="btn btn-ghost btn-sm" :disabled="hostBusy === s.id" @click="copyLocalAddress(s.id)">复制本地</button><span class="muted">（同一网络的好友可加入）</span></div>
         <div v-if="frpActive(s) && frpStateOf(s.id).remoteAddress" class="host-address host-frp-address">公网加入地址：<code>{{ frpStateOf(s.id).remoteAddress }}</code><button class="btn btn-ghost btn-sm" :disabled="frpStateOf(s.id).busy" @click="copyFrpAddress(s)">复制</button><span class="muted">（发给好友即可全网联机）</span></div>
         <p v-if="frpStateOf(s.id).error" class="host-frp-error">{{ frpStateOf(s.id).error }}</p>
         <p v-if="hostStatus[s.id]?.online && hostStatus[s.id]?.players" class="host-players muted">当前在线 {{ hostStatus[s.id]?.players }} 人</p>
