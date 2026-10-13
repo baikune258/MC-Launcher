@@ -296,7 +296,7 @@ async function saveFrpKey() {
   try {
     await kamucl.invoke('frp:nodes', { accessKey: key, refresh: true })
     await kamucl.invoke('frp:save-key', { accessKey: key })
-    toast('密钥已保存，正在公开服务器…', 'info')
+    toast('密钥已保存并记住，以后无需再输入，正在公开服务器…', 'info')
     frpKeyModal.value = false
     const target = hostServers.value.find((x) => x.id === frpKeyTarget.value)
     if (target) await onHostFrp(target)
@@ -307,11 +307,23 @@ async function saveFrpKey() {
 let offFrpEvent: (() => void) | undefined
 let frpPollTimer: ReturnType<typeof setInterval> | undefined
 
+// 进入页面自动读取已保存密钥对应的隧道与节点，穿透状态直接可见，不再弹出密钥输入框
+async function autoLoadFrpState() {
+  try {
+    const status = await kamucl.invoke('frp:status') as { accessKey?: string }
+    if (status?.accessKey) {
+      await kamucl.invoke('frp:nodes', { accessKey: status.accessKey })
+    }
+  } catch { /* 网络异常静默，轮询会继续兜底 */ }
+  await refreshFrpForServers()
+}
+
 onMounted(() => {
   void loadHostServers()
   pollTimer = setInterval(() => { void refreshHostStatuses() }, 8000)
   offFrpEvent = kamucl.on('frp:event', () => { void refreshFrpForServers() })
   frpPollTimer = setInterval(() => { void refreshFrpForServers() }, 6000)
+  void autoLoadFrpState()
 })
 onBeforeUnmount(() => {
   if (pollTimer) clearInterval(pollTimer)
