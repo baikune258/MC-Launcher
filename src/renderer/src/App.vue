@@ -42,7 +42,8 @@ import {
   resumeTask,
   selectFile,
   skipUpdateVersion,
-  startUpdateDownload
+  startUpdateDownload,
+  checkUpdate
 } from './api'
 import type { ReleaseInfo } from '@shared/types'
 import { QQ_GROUP_NUMBER } from '@shared/branding'
@@ -1067,6 +1068,10 @@ onMounted(async () => {
   void pollTickets()
   offs.push(installVisualDesign())
   void loadExitNotices()
+  // 启动器每次启动自动先检查更新（真实查询，不走 6 小时缓存）：有新版本直接弹出更新窗口
+  void checkUpdate(true).then((r) => {
+    if (r?.ok && r.hasUpdate && r.release) store.updatePrompt = { release: r.release, rollback: false }
+  })
   applyTheme(store.settings?.theme, store.settings?.custom)
   motionQuery.addEventListener('change', onMotionChange)
   // 每次上线自动切换一张背景图（按顺序/随机）；off 模式固定第一张
