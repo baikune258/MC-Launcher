@@ -241,7 +241,9 @@ async function onHostFrp(s: HostServerRecord) {
       return
     }
     let t = frpTunnelOf(status.tunnels || [], s.port)
+    let justCreated = false
     if (!t) {
+      justCreated = true
       const nodesRes = await kamucl.invoke('frp:nodes', { accessKey: key }) as { nodes?: Array<{ id: number; free: boolean; online: boolean; canCreate: boolean }> }
       const nodes = nodesRes.nodes || []
       const node = nodes.find((n) => n.free && n.online && n.canCreate) || nodes.find((n) => n.online && n.canCreate)
@@ -251,11 +253,13 @@ async function onHostFrp(s: HostServerRecord) {
       t = (after.tunnels || []).find((x) => x.config?.localPort === s.port)
     }
     if (!t?.id) throw new Error('隧道创建后未找到，请到「联机」页检查')
+    // 新建隧道需等待樱花平台生效，稍候再启动，避免 frpc 立即启动连不上
+    if (justCreated) await new Promise((r) => setTimeout(r, 1200))
     await kamucl.invoke('frp:start', { id: t.id })
     toast('已启动樱花穿透，正在连接公网…', 'info')
     // 快速轮询拿公网地址（frpc 建立隧道通常 1~3 秒）
-    for (let i = 0; i < 6; i++) {
-      await new Promise((r) => setTimeout(r, 700))
+    for (let i = 0; i < 8; i++) {
+      await new Promise((r) => setTimeout(r, 800))
       await refreshFrpForServers()
       if (frpStateOf(s.id).remoteAddress) break
     }

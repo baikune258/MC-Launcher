@@ -16,7 +16,8 @@ const operations = reactive(new Set<string>())
 const stopping = reactive(new Set<string>())
 const errorMsg = ref('')
 const editingAccount=ref(false), createOpen=ref(false)
-const accountReady=computed(()=>!!nodesResult.value && !nodesError.value)
+// 密钥已保存（本机记住）即视为账号就绪，不再展示“读取我的隧道与节点”输入按钮
+const accountReady=computed(()=>!!form.accessKey.trim() && !nodesError.value)
 const deleteTarget = ref<ManagedTunnel | null>(null)
 const deleting = ref(false)
 const deleteError = ref('')
@@ -106,6 +107,10 @@ onMounted(async () => {
     else tunnels.value.push(t)
   })
   await refreshStatus()
+  // 密钥已保存（本机记住）时自动读取隧道与节点，无需再手动点“读取我的隧道与节点”
+  if (form.accessKey.trim() && !nodesResult.value && !nodesLoading.value) {
+    void loadNodes(false, false)
+  }
 })
 onBeforeUnmount(() => { disposed = true; unsubscribe?.() })
 </script>
