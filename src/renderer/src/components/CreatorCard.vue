@@ -9,14 +9,17 @@ function onFocusOut(event: FocusEvent) { if (!(event.currentTarget as HTMLElemen
 </script>
 <template>
  <section class="creator-card" data-ui="home:creators" @pointerenter="expanded=true" @pointerleave="expanded=false" @focusin="expanded=true" @focusout="onFocusOut">
-  <div data-ui="CreatorCard:3b0bd35ff2cd" class="creator-heading"><button data-ui="CreatorCard:b838c4453411" class="creator-toggle" :aria-expanded="expanded" aria-controls="creator-names" @click="expanded=true">参与测试及创作者<small data-ui="CreatorCard:d9b60520217e" lang="en">TESTERS &amp; CREATORS</small></button><a data-ui="CreatorCard:86b4c178a448" href="https://github.com/baikune258/MC-Launcher" target="_blank" rel="noopener noreferrer" class="icon-btn" aria-label="访问baikun258的GitHub仓库">↗</a></div>
-  <div class="creator-message"><p data-ui="CreatorCard:5031cfb3dd7e" class="creator-intro">感谢每一位使用 MC-Launcher 的玩家。如果你喜欢这个启动器，欢迎到 GitHub 给 baikun258 点个 Star，有任何问题也欢迎反馈。</p></div>
+  <div data-ui="CreatorCard:3b0bd35ff2cd" class="creator-heading"><button data-ui="CreatorCard:b838c4453411" class="creator-toggle" :aria-expanded="expanded" aria-controls="creator-names" @click="expanded=true">参与测试及创作者<small data-ui="CreatorCard:d9b60520217e" lang="en">TESTERS &amp; CREATORS</small></button><span class="creator-actions"><a data-ui="CreatorCard:sponsor01" href="https://ifdian.net/a/baikun258" target="_blank" rel="noopener noreferrer" class="sponsor-btn" aria-label="赞助作者baikun258">赞助作者 ❤</a><a data-ui="CreatorCard:86b4c178a448" href="https://github.com/baikune258/MC-Launcher" target="_blank" rel="noopener noreferrer" class="icon-btn" aria-label="访问baikun258的GitHub仓库">↗</a></span></div>
+  <div class="creator-message"><p data-ui="CreatorCard:5031cfb3dd7e" class="creator-intro">感谢每一位使用 MC-Launcher 的玩家。如果你喜欢这个启动器，欢迎到 GitHub 给 baikun258 点个 Star；也欢迎到爱发电赞助作者（点击右上角「赞助作者 ❤」），支持持续更新！</p></div>
   <div class="creator-reveal" :class="{expanded}"><div class="creator-reveal-inner"><div :inert="!expanded" id="creator-names" class="creator-name-layer" :class="{moving:decorativeActive && expanded}" data-ui="home:creator-names"><span data-ui="CreatorCard:7cd0fbc9196c" v-for="(name,i) in names" :key="name" class="creator-bubble" :style="{'--delay':i*40+'ms','--drift-x':drift[i].x,'--drift-y':drift[i].y,'--duration':drift[i].duration}"><span data-ui="CreatorCard:587246bec0b9">{{name}}</span></span></div></div></div>
  </section>
 </template>
 <style scoped>
 .creator-card { min-width:0; overflow:hidden; padding:var(--card-pad); border:1px solid var(--border); border-radius:var(--radius-lg); background:var(--surface-content); }
 .creator-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.creator-actions { display:flex; align-items:center; gap:8px; }
+.sponsor-btn { display:inline-flex; align-items:center; gap:4px; font-size:12px; font-weight:700; color:#fff; background:linear-gradient(135deg,#f7b733,#e06b12); border-radius:999px; padding:6px 13px; text-decoration:none; box-shadow:0 2px 8px rgba(224,107,18,.35); white-space:nowrap; }
+.sponsor-btn:hover { filter:brightness(1.1); }
 .creator-toggle { color:var(--text); background:none; border:0; padding:0; text-align:left; font-size:14px; font-weight:600; cursor:pointer; }
 .creator-toggle small { display:block; font-size:11px; letter-spacing:1px; color:var(--text-dim); margin-top:4px; }
 .creator-intro { font-size:12px; line-height:1.7; color:var(--text-dim); margin:12px 0 0; }

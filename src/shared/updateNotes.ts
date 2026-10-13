@@ -8,6 +8,7 @@ export interface UpdateNote {
 
 /** 按版本倒序；latest 为当前版本 */
 export const updateNotes: UpdateNote[] = [
+  {"version":"1.1.64","date":"2026-10-13 08:20","changes":["新增首页赞助入口（爱发电）","内网穿透（FRP）优化"]},
   {"version":"1.1.63","date":"2026-10-13 07:10","changes":["修复了一些BUG或问题"]},
   {"version":"1.1.62","date":"2026-10-13 06:10","changes":["修复了一些BUG或问题"]},
   {"version":"1.1.61","date":"2026-10-13 05:10","changes":["修复了一些BUG或问题"]},
