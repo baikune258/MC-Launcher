@@ -784,7 +784,10 @@ async function launchOwned(
         : (customInfo ? `Minecraft ${placeholderVersion} | ${customInfo}` : '')
       if (finalTitle) {
         void applyGameWindowTitle(proc, finalTitle).then(
-          () => log(`[MC-Launcher] 游戏窗口标题已设为：${finalTitle}`),
+          () => {
+            log(`[MC-Launcher] 游戏窗口标题已设为：${finalTitle}`)
+            scheduleLauncherExit()
+          },
           error => log(`[MC-Launcher] 设置游戏窗口标题未完成：${error.message}`)
         )
       }
@@ -833,6 +836,8 @@ async function launchOwned(
   // spawnGameProcess returns only after the OS confirms process creation.
   launchLog.info(`游戏进程已启动：pid=${proc.pid}`)
   onState({ status: 'running', text: '游戏进程已启动' })
+  // 游戏已拉起：无论窗口标题是否设置成功，均安排启动器自动退出（兜底 25 秒），后台只保留游戏本体进程
+  scheduleLauncherExit(25000)
   // QuickPlay 直达（创建命令世界/进服）：游戏窗口出现后拉到前台，避免鼠标被锁在未聚焦窗口里
   if (options.singleplayerWorld || serverAddress) {
     void focusGameWindow(proc).then(() => log('[MC-Launcher] 游戏窗口已聚焦')).catch(error => log(`[MC-Launcher] 自动聚焦未完成：${error.message}；请点击任务栏中的 Minecraft 窗口`))
@@ -898,4 +903,16 @@ async function launchOwned(
     if (!spawned) await appearance.offlineSkin?.dispose()
     if (!spawned) { logStream?.end(); stdoutStream?.end(); stderrStream?.end() }
   }
+}
+
+/** 游戏启动成功后启动器自动退出：只触发一次；后台仅保留游戏本体进程 */
+let launcherExitScheduled = false
+function scheduleLauncherExit(delayMs = 800): void {
+  if (launcherExitScheduled) return
+  launcherExitScheduled = true
+  setTimeout(() => {
+    launchLog.info('游戏已启动，启动器自动退出（后台只保留游戏进程）')
+    console.log('[MC-Launcher] 游戏已启动，启动器自动退出（后台只保留游戏进程）')
+    void app.quit()
+  }, delayMs)
 }
