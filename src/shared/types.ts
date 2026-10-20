@@ -1102,7 +1102,7 @@ export interface ModInstallPlan {
 
 /** 整合包探测信息（导入确认弹窗用） */
 export interface ModpackInfo {
-  format: 'mrpack' | 'curseforge' | 'fullpack'
+  format: 'mrpack' | 'curseforge' | 'fullpack' | 'archive'
   /** 包内声明的名称 */
   innerName: string
   /** 压缩包文件名（去扩展名） */
@@ -1133,6 +1133,8 @@ export interface ModpackInstallRequest {
   targetFolder?: string
   conflictAction?: ModpackConflictAction
   existingId?: string
+  /** 无清单整合包（archive）导入内容时的目标实例 id；该类型不新建实例，只向既有实例补充文件。 */
+  mergeIntoInstanceId?: string
   /** 更新/覆盖涉及既有实例时，必须由确认页显式置 true。 */
   confirmReplace?: boolean
   /** 导入时用启动器默认键位替换整合包 options.txt 中的 key_* 预设（默认关闭=保留作者预设） */

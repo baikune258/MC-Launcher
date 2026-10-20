@@ -46,11 +46,10 @@ async function editPacks(action: () => Promise<DefaultResourcePack[]>, enable = 
   } catch (e) { toast('材质包配置失败：' + errText(e), 'error') }
   finally { packsBusy.value = false }
 }
-async function dropPacks(event: DragEvent) {
+async function dropPacks(paths: string[]) {
   selectSection('packs')
   dragActive.value = false
-  const files = Array.from(event.dataTransfer?.files ?? [])
-  await editPacks(() => importDefaultResourcePacks(files.map(file => window.kamucl.getFilePath(file)).filter(Boolean)), true)
+  await editPacks(() => importDefaultResourcePacks(paths.filter(Boolean)), true)
 }
 
 onMounted(() => { store.resourceDropHandler = dropPacks })

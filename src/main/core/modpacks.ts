@@ -283,16 +283,19 @@ async function detectFullpackEntry(zip: PackZip): Promise<FullpackDetected | nul
 type Detected =
   | { format: 'mrpack' | 'curseforge' }
   | { format: 'fullpack'; full: FullpackDetected }
+  | { format: 'archive'; archive: ArchiveDetected }
 
-/** 三格式探测：mrpack → curseforge → fullpack，均不命中抛错 */
+/** 四格式探测：mrpack → curseforge → fullpack → 无清单整合包，均不命中抛错 */
 async function detectPack(zip: PackZip): Promise<Detected> {
   const names = new Set(zip.getEntries().map((e) => normEntry(e.entryName)))
   if (names.has('modrinth.index.json')) return { format: 'mrpack' }
   if (names.has('manifest.json')) return { format: 'curseforge' }
   const full = await detectFullpackEntry(zip)
   if (full) return { format: 'fullpack', full }
+  const archive = detectArchivePack(zip)
+  if (archive) return { format: 'archive', archive }
   throw new Error(
-    '无法识别的整合包格式（支持 Modrinth .mrpack、CurseForge .zip 与含 versions 目录的完整客户端包）'
+    '无法识别的整合包格式（支持 Modrinth .mrpack、CurseForge .zip、含 versions 目录的完整客户端包，以及含 mods/config 的游戏目录压缩包）'
   )
 }
 
@@ -540,6 +543,85 @@ const GAME_ROOT_HINTS = new Set([
   'servers.dat',
   'servers.dat_old'
 ])
+
+/** 无清单整合包（作者直接把游戏目录压成 zip）识别结果 */
+interface ArchiveDetected {
+  /** 游戏根前缀（'' = zip 根，如 'xxx/.minecraft/'） */
+  prefix: string
+  /** 命中 mods/*.jar 的数量 */
+  jarCount: number
+}
+
+/**
+ * 无清单整合包探测：zip 内含 mods/*.jar 或 config 等游戏根内容。
+ * 只有材质包 / 光影 / 存档目录时不判定，避免吞掉普通资源压缩包与世界存档。
+ */
+function detectArchivePack(zip: PackZip): ArchiveDetected | null {
+  const buckets = new Map<string, string[]>()
+  for (const entry of zip.getEntries()) {
+    if (entry.isDirectory) continue
+    const name = normEntry(entry.entryName)
+    if (!name) continue
+    const lower = name.toLowerCase()
+    const mi = lower.indexOf('.minecraft/')
+    let rel: string
+    let prefix: string
+    if (mi >= 0) {
+      rel = name.slice(mi + '.minecraft/'.length)
+      prefix = name.slice(0, mi + '.minecraft/'.length)
+    } else {
+      const first = lower.split('/')[0] ?? ''
+      if (!GAME_ROOT_HINTS.has(first)) continue
+      rel = name
+      prefix = ''
+    }
+    if (!rel) continue
+    const list = buckets.get(prefix)
+    if (list) list.push(rel)
+    else buckets.set(prefix, [rel])
+  }
+  let best: { prefix: string; rels: string[] } | null = null
+  for (const [prefix, rels] of buckets) {
+    if (!best || rels.length > best.rels.length) best = { prefix, rels }
+  }
+  if (!best) return null
+  let jarCount = 0
+  let configCount = 0
+  for (const rel of best.rels) {
+    if (/^mods\//i.test(rel) && /\.jar$/i.test(rel)) jarCount++
+    else if (/^config\//i.test(rel)) configCount++
+  }
+  if (!jarCount && !configCount) return null
+  return { prefix: best.prefix, jarCount }
+}
+
+/** 无清单包导入时永不覆盖的本地内容（存档、设置与日志属于玩家自己的数据） */
+const ARCHIVE_KEEP_DIR = /^(saves|screenshots|logs|crash-reports|backups|versions)\//i
+const ARCHIVE_KEEP_FILE = new Set([
+  'options.txt',
+  'optionsof.txt',
+  'servers.dat',
+  'servers.dat_old',
+  'usercache.json',
+  'launcher_profiles.json',
+  'launcher_accounts.json'
+])
+
+/** 无清单包条目 → 相对实例游戏目录的路径；与游戏无关或本地数据返回 null */
+function archiveGameRel(name: string, det: ArchiveDetected): string | null {
+  if (det.prefix) {
+    if (!name.startsWith(det.prefix)) {
+      const mi = name.toLowerCase().indexOf('.minecraft/')
+      if (mi < 0) return null
+      const rel = name.slice(mi + '.minecraft/'.length)
+      return rel || null
+    }
+    return name.slice(det.prefix.length) || null
+  }
+  const first = name.split('/')[0]?.toLowerCase() ?? ''
+  return GAME_ROOT_HINTS.has(first) ? name : null
+}
+
 
 /**
  * 计算全量包普通条目相对游戏根的路径与来源优先级。
@@ -921,8 +1003,28 @@ export async function probeRecognizedModpack(filePath: string): Promise<ModpackI
   const zip = await openPackZip(filePath)
   try {
   const names = new Set(zip.getEntries().map(entry => normEntry(entry.entryName)))
-  if (!names.has('modrinth.index.json') && !names.has('manifest.json') && !await detectFullpackEntry(zip)) return null
-  return await modpackInfo(zip, filePath)
+  if (names.has('modrinth.index.json') || names.has('manifest.json') || await detectFullpackEntry(zip)) {
+    return await modpackInfo(zip, filePath)
+  }
+  // 无清单整合包：作者直接把游戏目录压成 zip，导入时补充进用户指定的实例。
+  const archive = detectArchivePack(zip)
+  if (archive) {
+    const fileName = packFileName(filePath)
+    const entries = zip.getEntries().filter((entry) => !entry.isDirectory)
+    return {
+      format: 'archive',
+      innerName: fileName,
+      fileName,
+      version: '',
+      mcVersion: '',
+      fileCount: entries.length,
+      downloadBytes: entries.reduce((sum, entry) => sum + entry.header.size, 0),
+      hasOverrides: false,
+      hasClientOverrides: false,
+      existingInstances: []
+    }
+  }
+  return null
   } finally { await zip.dispose() }
 }
 
@@ -1003,6 +1105,75 @@ export async function installModpack(
   }
 }
 
+/**
+ * 无清单整合包导入：把包内游戏文件补充进用户指定的既有实例。
+ * 既有同名文件一律保留（不覆盖玩家的模组、配置与存档），失败或取消时只回滚本次新建的文件。
+ */
+async function installArchiveInto(
+  zip: PackZip,
+  det: ArchiveDetected,
+  targetFolder: string,
+  emit: ProgressEmit,
+  signal: AbortSignal | undefined,
+  instanceId: string | undefined
+): Promise<string> {
+  const id = sanitizeId((instanceId ?? '').trim())
+  if (!id) throw new Error('该压缩包没有整合包清单，请选择要导入内容的游戏实例')
+  const target = listAllInstalled().find((item) => item.id === id && samePath(item.folder, targetFolder))
+  if (!target) throw new Error(`目标文件夹中找不到待导入的实例：${id}`)
+  const instDir = target.gameDirectory || versionDir(id)
+  emit({ stage: 'modpack', progress: 0, text: `导入整合包内容到 ${id}…` })
+
+  const picked = new Map<string, { entry: PackEntry; dest: string }>()
+  for (const entry of zip.getEntries()) {
+    if (entry.isDirectory) continue
+    const name = normEntry(entry.entryName)
+    if (!name) continue
+    const rel = archiveGameRel(name, det)
+    if (!rel || skipFullEntry(rel)) continue
+    if (ARCHIVE_KEEP_DIR.test(rel)) continue
+    if (ARCHIVE_KEEP_FILE.has(rel.toLowerCase())) continue
+    const dest = safeJoin(instDir, rel)
+    if (!dest) continue
+    picked.set(rel.toLowerCase(), { entry, dest })
+  }
+  const ops = [...picked.values()]
+  if (!ops.length) throw new Error('压缩包内没有可导入的游戏文件')
+  const total = ops.length
+  const created: string[] = []
+  let done = 0
+  let skipped = 0
+  try {
+    for (const op of ops) {
+      throwIfCancelled(signal)
+      done++
+      if (fs.existsSync(op.dest)) { skipped++; continue }
+      fs.mkdirSync(path.dirname(op.dest), { recursive: true })
+      await writePackEntry(op.entry, op.dest, signal, {
+        exclusive: true,
+        onCreated: () => created.push(op.dest)
+      })
+      if (done % 8 === 0 || done === total) {
+        emit({
+          stage: 'modpack',
+          progress: total ? done / total : 1,
+          text: `导入游戏文件 ${done}/${total}`
+        })
+        await new Promise<void>((resolve) => setImmediate(resolve))
+      }
+    }
+  } catch (e) {
+    for (const file of created.reverse()) fs.rmSync(file, { force: true })
+    throw e
+  }
+  emit({
+    stage: 'done',
+    progress: 1,
+    text: `已导入 ${total - skipped} 个文件到 ${id}${skipped ? `（已存在 ${skipped} 个文件，未覆盖）` : ''}`
+  })
+  return id
+}
+
 async function installModpackInFolder(filePath: string, emit: ProgressEmit, opts?: ModpackInstallOpts): Promise<string> {
   let manualFiles: ManualModpackRequest | null = null
   const report: ProgressEmit = (event) =>
@@ -1018,6 +1189,11 @@ async function installModpackInFolder(filePath: string, emit: ProgressEmit, opts
   // 全量包：解压即玩，无需下载
   if (detected.format === 'fullpack') {
     return await installFullpack(zip, detected.full, fileName, nameSource, report, opts?.signal)
+  }
+
+  // 无清单整合包：不新建实例，把包内游戏文件补充进用户指定的既有实例
+  if (detected.format === 'archive') {
+    return await installArchiveInto(zip, detected.archive, targetFolder, report, opts?.signal, opts?.mergeIntoInstanceId)
   }
 
   // 2) 解析清单

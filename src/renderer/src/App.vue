@@ -48,7 +48,7 @@ import {
 import type { ReleaseInfo } from '@shared/types'
 import { QQ_GROUP_NUMBER } from '@shared/branding'
 import UpdateModal from './components/UpdateModal.vue'
-import { applyLaunchState, dismissTask, enterEditMode, exitEditMode, finalizeTask, markNoticesRead, recordLastPlayed, refreshAccounts, refreshInstalled, resetProgressMono, stageLabel, store, toast, upsertTaskProgress } from './store'
+import { applyLaunchState, dismissTask, displayVersionName, enterEditMode, exitEditMode, finalizeTask, markNoticesRead, recordLastPlayed, refreshAccounts, refreshInstalled, resetProgressMono, stageLabel, store, toast, upsertTaskProgress } from './store'
 import type { ViewName } from './store'
 import type {
   CustomTheme,
@@ -395,6 +395,11 @@ watch(dragActive, (active) => (active ? startDragWatchdog() : stopDragWatchdog()
 
 const dragHasFiles = (e: DragEvent) =>
   Array.from(e.dataTransfer?.types ?? []).includes('Files')
+/** 拖入来源（压缩软件虚拟目录、权限受限路径）取不到真实路径时统一降级为空串并提示。 */
+const DROP_PATH_HINT = '未能读取拖入文件的位置：请先把文件解压或保存到文件夹，再从文件夹拖入'
+function dropPath(file: File): string {
+  try { return window.kamucl.getFilePath(file) || '' } catch { return '' }
+}
 const dragHasProviderText = (e: DragEvent) => {
   const types = Array.from(e.dataTransfer?.types ?? [])
   return types.includes('text/plain') || types.includes('text/uri-list')
@@ -447,8 +452,11 @@ function onDrop(e: DragEvent) {
   if (resourceDropPage() && !mrpackDrop) {
     endDrag(); e.preventDefault(); e.stopPropagation()
     if (dragHasFiles(e)) {
-      if (store.resourceDropHandler) store.resourceDropHandler(e)
-      else toast('页面正在加载，请稍后再拖入', 'info')
+      // 资源页也允许整包导入：先在同步阶段取路径，再按内容分类。
+      // 压缩包若被识别为整合包则走整合包安装，其余交回页面既有的资源批量导入。
+      const paths = Array.from(e.dataTransfer?.files ?? []).map(dropPath).filter((p): p is string => !!p)
+      if (!paths.length) { toast(DROP_PATH_HINT, 'error'); return }
+      void routeResourcePageDrop(paths)
     }
     return
   }
@@ -464,25 +472,29 @@ function onDrop(e: DragEvent) {
       e.dataTransfer?.getData('text/plain') || e.dataTransfer?.getData('text/uri-list') || ''
     if (looksLikeYggdrasilProvider(text)) {
       routeYggdrasilImport({ kind: 'text', value: text })
+    } else if (dragHasFiles(e)) {
+      // 拖拽携带文件对象却取不到路径：多为压缩软件虚拟目录或权限受限来源
+      toast(DROP_PATH_HINT, 'error')
     }
     return
   }
-  const paths = dropped.map((f) => window.kamucl.getFilePath(f))
+  const paths = dropped.map(dropPath)
   const names = dropped.map((f) => f.name.toLowerCase())
+  if (paths.every((p) => !p)) { toast(DROP_PATH_HINT, 'error'); return }
 
-  if (names.length === 1 && /\.(json|txt|url|yggdrasil)$/.test(names[0])) {
+  if (names.length === 1 && /\.(json|txt|url|yggdrasil)$/.test(names[0]) && paths[0]) {
     routeYggdrasilImport({ kind: 'file', value: paths[0] })
     return
   }
 
   // 单项拖入先按内容识别：.mrpack 始终优先，ZIP/文件夹可能是世界存档。
-  if (names.length === 1) {
+  if (names.length === 1 && paths[0]) {
     void routeSingleImport(paths[0], names[0])
     return
   }
   // 全部为非压缩包扩展（.jar 或文件夹）→ MOD 拖入即装流程
-  if (names.every((n) => !/\.(mrpack|zip)$/.test(n))) {
-    modDrop.files = paths
+  if (paths.every((p) => p) && names.every((n) => !/\.(mrpack|zip)$/.test(n))) {
+    modDrop.files = paths as string[]
     modDrop.open = true
     return
   }
@@ -525,16 +537,30 @@ async function routeSingleImport(filePath: string, _displayName: string) {
   }
 }
 
+/** 资源页拖入：单个压缩包先按内容判断是否为整合包，是则转入整合包安装，否则交回页面既有的资源导入。 */
+async function routeResourcePageDrop(paths: string[]) {
+  if (paths.length === 1 && /\.(zip|mrpack)$/i.test(paths[0])) {
+    try {
+      const result = await probeImport(paths[0])
+      if (result.kind === 'modpack') { await openModpackImport(paths[0], result.info); return }
+    } catch { /* 探测失败时退回资源导入，不阻断原有流程 */ }
+  }
+  if (store.resourceDropHandler) store.resourceDropHandler(paths)
+  else toast('页面正在加载，请稍后再拖入', 'info')
+}
+
 // ---------------- 整合包导入确认弹窗 ----------------
 const FORMAT_LABEL: Record<ModpackInfo['format'], string> = {
   mrpack: 'Modrinth (.mrpack)',
   curseforge: 'CurseForge',
-  fullpack: '完整客户端包'
+  fullpack: '完整客户端包',
+  archive: '整合包（无清单）'
 }
 const FORMAT_TAG_CLASS: Record<ModpackInfo['format'], string> = {
   mrpack: 'tag-success',
   curseforge: 'tag-gold',
-  fullpack: 'tag-cyan'
+  fullpack: 'tag-cyan',
+  archive: 'tag-cyan'
 }
 
 interface ModpackModal {
@@ -550,6 +576,8 @@ interface ModpackModal {
   existingId: string
   confirmReplace: boolean
   keySyncOverride: boolean
+  /** 无清单整合包：内容导入到的既有实例 */
+  mergeInstanceId: string
 }
 
 const mpModal = reactive<ModpackModal>({
@@ -564,8 +592,15 @@ const mpModal = reactive<ModpackModal>({
   conflictAction: 'rename',
   existingId: '',
   confirmReplace: false,
-  keySyncOverride: false
+  keySyncOverride: false,
+  mergeInstanceId: ''
 })
+
+/** 无清单整合包（作者直接压缩游戏目录）：不新建实例，只把内容补充进既有实例 */
+const mpIsArchive = computed(() => mpModal.info?.format === 'archive')
+const mpArchiveTargets = computed(() =>
+  store.installed.filter((item) => !mpModal.targetFolder || item.folder === mpModal.targetFolder)
+)
 
 const mpFormatLabel = computed(() => (mpModal.info ? FORMAT_LABEL[mpModal.info.format] : ''))
 const mpFormatTagClass = computed(() =>
@@ -643,6 +678,14 @@ async function openModpackImport(filePath: string, knownInfo?: ModpackInfo) {
     if (mpModal.filePath === filePath) {
       mpModal.info = info
       mpModal.customName = info.fileName
+      if (info.format === 'archive') {
+        // 无清单包没有版本信息，只能补充进既有实例：优先当前文件夹，其次任意已安装实例
+        const preferred =
+          store.installed.find((item) => item.folder === mpModal.targetFolder) ?? store.installed[0]
+        mpModal.mergeInstanceId = preferred?.id ?? ''
+        if (preferred) mpModal.targetFolder = preferred.folder
+        return
+      }
       const relevant = info.existingInstances.find(
         (item) => item.folder === mpModal.targetFolder && (item.sameNormalizedName || item.samePackVersion)
       )
@@ -663,6 +706,26 @@ function closeModpackImport() {
 /** 确认导入：主进程后台异步执行，完成/失败由 installDone 订阅统一提示 */
 function confirmModpackImport() {
   if (!mpModal.info) return
+  // 无清单整合包：只向用户选定的既有实例补充文件，不新建实例
+  if (mpIsArchive.value) {
+    const target = mpArchiveTargets.value.find((item) => item.id === mpModal.mergeInstanceId)
+    if (!target) {
+      mpModal.error = mpArchiveTargets.value.length
+        ? '请选择要导入内容的游戏实例'
+        : '当前游戏文件夹没有可用实例，请先在「版本」中安装一个游戏版本'
+      return
+    }
+    const filePath = mpModal.filePath
+    mpModal.open = false
+    toast('开始导入整合包内容…', 'info')
+    void installModpack(filePath, {
+      targetFolder: target.folder,
+      mergeIntoInstanceId: target.id
+    }).catch((e) => {
+      toast('整合包导入失败：' + errText(e), 'error')
+    })
+    return
+  }
   if (!mpModal.customName.trim()) {
     mpModal.error = '实例名称不能为空'
     return
@@ -1634,7 +1697,7 @@ onUnmounted(() => {
         <template v-else-if="mpModal.info">
           <div data-ui="App:13fbc913792f" class="mp-tags">
             <span data-ui="App:01e576fd177a" class="tag" :class="mpFormatTagClass">{{ mpFormatLabel }}</span>
-            <span data-ui="App:efee1a142b01" class="tag">MC {{ mpModal.info.mcVersion }}</span>
+            <span data-ui="App:efee1a142b01" class="tag" v-if="mpModal.info.mcVersion">MC {{ mpModal.info.mcVersion }}</span>
             <span data-ui="App:cbc7743772be" v-if="mpModal.info.loader" class="tag tag-gold">
               {{ mpModal.info.loader
               }}{{ mpModal.info.loaderVersion ? ' ' + mpModal.info.loaderVersion : '' }}
@@ -1646,18 +1709,36 @@ onUnmounted(() => {
             >
           </div>
           <p data-ui="App:94bfb09f6b96" class="mp-summary">
-            {{ mpModal.info.fileCount }} 个清单文件 · {{ fmtPackBytes(mpModal.info.downloadBytes) }}
+            {{ mpModal.info.fileCount }} {{ mpIsArchive ? '个文件' : '个清单文件' }} · {{ fmtPackBytes(mpModal.info.downloadBytes) }}
             <span data-ui="App:b63322e9dda7" v-if="mpModal.info.hasOverrides"> · overrides</span>
             <span data-ui="App:99b02870d974" v-if="mpModal.info.hasClientOverrides"> · client-overrides</span>
           </p>
 
-          <p data-ui="App:596a49ffb57e" class="mp-label">目标游戏文件夹</p>
-          <select data-ui="App:274944e712ba" v-model="mpModal.targetFolder" class="select" @change="onMpTargetFolderChange">
+          <p data-ui="App:596a49ffb57e" class="mp-label" v-if="!mpIsArchive">目标游戏文件夹</p>
+          <select data-ui="App:274944e712ba" v-if="!mpIsArchive" v-model="mpModal.targetFolder" class="select" @change="onMpTargetFolderChange">
             <option v-for="folder in store.settings?.folders || []" :key="folder.path" :value="folder.path">
               {{ folder.name }}{{ folder.isDefault ? '（默认）' : '' }} · {{ folder.path }}
             </option>
           </select>
 
+          <!-- 无清单整合包：没有版本信息，只能把内容补充进既有实例 -->
+          <template v-if="mpIsArchive">
+            <p data-ui="App:archive-target-label" class="mp-label">导入到实例</p>
+            <select data-ui="App:archive-target-select" v-model="mpModal.mergeInstanceId" class="select">
+              <option v-for="item in mpArchiveTargets" :key="item.id" :value="item.id">
+                {{ displayVersionName(item) }} · {{ item.id }}
+              </option>
+            </select>
+            <div data-ui="App:archive-target-impact" class="mp-impact">
+              该压缩包没有整合包清单（非 Modrinth / CurseForge 格式），将把包内的 mods、config 等游戏文件补充进所选实例。
+              已存在的同名文件不会覆盖，存档、设置与截图不受影响。
+            </div>
+            <p data-ui="App:archive-target-empty" v-if="!mpArchiveTargets.length" class="mp-error">
+              当前游戏文件夹没有可用实例，请先在「版本」中安装一个游戏版本，再导入本整合包。
+            </p>
+          </template>
+
+          <template v-if="!mpIsArchive">
           <p data-ui="App:7b097008a36b" class="mp-label">实例命名</p>
           <div data-ui="App:72a2299fc011" class="mp-name-opts">
             <button data-ui="App:3a719b866a06"
@@ -1723,8 +1804,9 @@ onUnmounted(() => {
             <input data-ui="App:e3245af7e07a" v-model="mpModal.keySyncOverride" type="checkbox" />
             <span data-ui="App:25de5e67e1b9">该整合包含作者预设键位（options.txt）。用启动器默认按键替换预设键位；其余设置保留。不勾选则保留作者预设。</span>
           </label>
+          </template>
 
-          <p data-ui="App:9feeb075e091" v-if="mpNameConflict && mpModal.conflictAction === 'rename'" class="mp-error">
+          <p data-ui="App:9feeb075e091" v-if="!mpIsArchive && mpNameConflict && mpModal.conflictAction === 'rename'" class="mp-error">
             名称「{{ mpModal.customName }}」已存在，请重新命名或选择其他处理方式。
           </p>
           <p data-ui="App:88ee270d21af" v-if="mpModal.error" class="mp-error">{{ mpModal.error }}</p>

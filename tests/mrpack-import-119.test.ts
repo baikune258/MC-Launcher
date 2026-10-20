@@ -44,8 +44,8 @@ async function fixture(run: (root: string) => Promise<void>) {
 function dropHarness(view: string) {
   const file = 'src/renderer/src/App.vue', descriptor = parse(fs.readFileSync(file, 'utf8'), { filename: file }).descriptor
   const source = ts.createSourceFile(file, descriptor.scriptSetup!.content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
-  const functions = new Set(['onDrop', 'routeSingleImport', 'endDrag'])
-  const variables = new Set(['resourceDropPage', 'dragHasFiles', 'dragHasSupportedData', 'looksLikeYggdrasilProvider'])
+  const functions = new Set(['onDrop', 'routeSingleImport', 'routeResourcePageDrop', 'dropPath', 'endDrag'])
+  const variables = new Set(['resourceDropPage', 'dragHasFiles', 'dragHasSupportedData', 'looksLikeYggdrasilProvider', 'DROP_PATH_HINT'])
   const statements = source.statements.filter(statement =>
     ts.isFunctionDeclaration(statement) && functions.has(statement.name?.text ?? '') ||
     ts.isVariableStatement(statement) && statement.declarationList.declarations.some(declaration => ts.isIdentifier(declaration.name) && variables.has(declaration.name.text)))

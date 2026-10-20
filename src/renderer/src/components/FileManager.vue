@@ -80,12 +80,13 @@ async function load() {
 }
 
 const importing = ref(false)
-async function dropResources(event: DragEvent) {
+async function dropResources(paths: string[]) {
   const v = currentVersion.value
   if (!v) { toast('请先选择当前文件夹中的游戏版本', 'error'); return }
   if (importing.value) return
   const folder = v.folder || activeFolder.value, kind = props.rel
-  const files = Array.from(event.dataTransfer?.files ?? []).map(f => window.kamucl.getFilePath(f)).filter(Boolean)
+  const files = paths.filter(Boolean)
+  if (!files.length) return
   importing.value = true
   try {
     const count = await importResources(files, v.id, folder, kind)
