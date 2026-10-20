@@ -988,7 +988,13 @@ async function downloadAndExtractJava(need: number, emit: ProgressEmit, architec
     if (!response.ok) { await response.body?.cancel(); throw new Error(`${new URL(url).hostname} HTTP ${response.status}`) }
     return response.json()
   }
-  return provisionJava({ major: need, os: IS_WIN ? 'windows' : IS_MAC ? 'mac' : 'linux', arch }, read, async pkg => {
+  // Mirrors expose plain directory listings rather than JSON metadata.
+  const readText = async (url: string): Promise<string> => {
+    const response = await httpFetch(url, { systemProxy: true, signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(12000)]) : AbortSignal.timeout(12000) })
+    if (!response.ok) { await response.body?.cancel(); throw new Error(`${new URL(url).hostname} HTTP ${response.status}`) }
+    return await response.text()
+  }
+  return provisionJava({ major: need, os: IS_WIN ? 'windows' : IS_MAC ? 'mac' : 'linux', arch }, read, readText, async pkg => {
     const root = path.resolve(runtimesDir())
     fs.mkdirSync(root, { recursive: true })
     const staging = fs.mkdtempSync(path.join(root, '.java-'))
@@ -998,6 +1004,10 @@ async function downloadAndExtractJava(need: number, emit: ProgressEmit, architec
       const size = await javaPackageSize(pkg, url => httpFetch(url, { method: 'HEAD', systemProxy: true, signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(10000)]) : AbortSignal.timeout(10000) }))
       signal?.throwIfAborted()
       await downloadFile(pkg.url, archive, (done, total) => emit({ stage: 'java', progress: total ? done / total * .85 : 0, bytesDone: done, text: `下载 Java ${need} · ${pkg.provider} ${(done / 1048576).toFixed(1)}${total ? '/' + (total / 1048576).toFixed(1) : ''} MB` }), undefined, 'official', signal, [], { sha256: pkg.sha256, size, systemProxy: true, maxAttempts: 2 })
+      // A mirror archive has no published checksum, so reject anything that is
+      // obviously not a JRE before extraction; the runtime itself is still
+      // verified by running it below.
+      if (!pkg.sha256 && fs.statSync(archive).size < 15 * 1024 * 1024) throw new Error(`${pkg.provider} 返回的 Java 包体积异常，可能下载不完整或来源异常`)
       emit({ stage: 'java', progress: .9, text: `校验通过，正在解压 Java ${need} · ${pkg.provider}` })
       fs.mkdirSync(extracted)
       if (IS_WIN) new AdmZip(archive).extractAllTo(extracted, true)

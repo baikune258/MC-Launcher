@@ -425,6 +425,13 @@ async function launchOwned(
   const timed = async <T>(stage: string, work: () => Promise<T>): Promise<T> => {
     const started = Date.now()
     try { deadline.signal.throwIfAborted(); const result = await work(); deadline.signal.throwIfAborted(); return result }
+    catch (error) {
+      // Surface the reason in the launch log the user can read and export, not
+      // only in the internal diagnostic log: this is where network-dependent
+      // preparation (Java runtime, libraries, assets) fails.
+      if (!deadline.signal.aborted) log(`[MC-Launcher] 启动准备 · ${stage} 失败：${(error instanceof Error ? error.message : String(error)).replace(/\s*\n\s*/g, '；')}`)
+      throw error
+    }
     finally { log(`[MC-Launcher] 启动准备 · ${stage}：${Date.now() - started}ms`) }
   }
   // Both runtime selection and game options wait for the same verified client.
