@@ -13,6 +13,7 @@ import * as yggdrasil from './yggdrasil'
 import { microsoftFetch } from './microsoftTls'
 import { logScope } from './launcherLog'
 import { protectedCredentialStorage, credentialStorageStatus } from './credentialProtection'
+import { writeAccountBackup, restoreAccountBackupIfNeeded } from './accountBackup'
 
 const authLog = logScope('ms-auth')
 
@@ -139,6 +140,14 @@ function serializeAccount(account: Account): StoredAccount {
 function load(): AccountsFile {
   if (cached) return cached
   let migrate = false
+  // 主文件缺失或损坏时，先尝试自动快照恢复（防止更新/误删后登录信息丢失）
+  try {
+    if (restoreAccountBackupIfNeeded(storeFile())) {
+      authLog.warn('accounts.json 缺失或损坏，已从 .account-backup 自动恢复登录信息')
+    }
+  } catch (error) {
+    authLog.warn(`账号备份恢复检查失败（不影响继续启动）：${String(error)}`)
+  }
   try {
     const raw = JSON.parse(fs.readFileSync(storeFile(), 'utf-8')) as StoredAccountsFile
     const accounts = Array.isArray(raw.accounts)
@@ -174,6 +183,12 @@ function persist(): void {
     selectedId: data.selectedId
   }
   fs.writeFileSync(storeFile(), JSON.stringify(stored, null, 2), { encoding: 'utf-8', mode: 0o600 })
+  // 同步留一份自动快照：主文件丢失/损坏时启动可自动恢复登录信息
+  try {
+    writeAccountBackup(storeFile(), JSON.stringify(stored, null, 2))
+  } catch (error) {
+    authLog.warn(`账号自动备份写入失败（不影响主文件）：${String(error)}`)
+  }
   if (process.platform === 'linux') fs.chmodSync(storeFile(), 0o600)
   storedSecrets.clear()
   for (const row of stored.accounts ?? []) if (row.secure) storedSecrets.set(row.id, { ...row.secure })

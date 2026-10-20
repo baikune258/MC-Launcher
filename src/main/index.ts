@@ -15,6 +15,7 @@ import {
   logScope
 } from './core/launcherLog'
 import { getSettings, migrateLegacyAppearanceAssets, migratePortableGameFolderToAppDir, cleanupLegacyGameFolder } from './core/settings'
+import { migrateLegacyUserData } from './core/legacyDataMigration'
 import { windowAppearance } from './windowAppearance'
 import { applyNativeAppearance } from './nativeAppearance'
 import { loadWindowState, trackWindowState, applyMaximized, toggleMaximize, restoreWindowBounds } from './windowState'
@@ -229,14 +230,8 @@ app.whenReady().then(async () => {
   if (PORTABLE_EXE && LEGACY_USER_DATA !== app.getPath('userData')) {
     try {
       const fresh = app.getPath('userData')
-      mkdirSync(fresh, { recursive: true })
-      if (existsSync(LEGACY_USER_DATA)) {
-        if (readdirSync(fresh).length === 0) {
-          for (const name of readdirSync(LEGACY_USER_DATA)) renameSync(join(LEGACY_USER_DATA, name), join(fresh, name))
-        }
-        rmSync(LEGACY_USER_DATA, { recursive: true, force: true })
-        launcherLogInfo('main', `已清理旧版 C 盘数据目录：${LEGACY_USER_DATA}`)
-      }
+      const result = migrateLegacyUserData(LEGACY_USER_DATA, fresh)
+      launcherLogInfo('main', `旧版 C 盘数据目录处理完成：${LEGACY_USER_DATA}${result.imported ? `（迁入 ${result.imported} 个历史文件）` : ''}`)
     } catch (error) { launcherLogWarn('main', `旧数据迁移/清理跳过：${String(error).slice(0, 120)}`) }
   }
   launcherLogInfo('main', `Electron 就绪（版本 ${app.getVersion()}）`)

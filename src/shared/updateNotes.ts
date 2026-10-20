@@ -8,6 +8,7 @@ export interface UpdateNote {
 
 /** 按版本倒序；latest 为当前版本 */
 export const updateNotes: UpdateNote[] = [
+  {"version":"1.1.74","date":"2026-10-20 15:40","changes":["修复了一些BUG或问题"]},
   {"version":"1.1.73","date":"2026-10-20 15:27","changes":["修复了一些BUG或问题"]},
   {"version":"1.1.72","date":"2026-10-20 09:03","changes":["修复了一些BUG或问题"]},
   {"version":"1.1.71","date":"2026-10-19 14:47","changes":["修复了一些BUG或问题"]},
