@@ -554,13 +554,15 @@ const FORMAT_LABEL: Record<ModpackInfo['format'], string> = {
   mrpack: 'Modrinth (.mrpack)',
   curseforge: 'CurseForge',
   fullpack: '完整客户端包',
-  archive: '整合包（无清单）'
+  archive: '整合包（无清单）',
+  mmc: 'MultiMC / Prism / PCL'
 }
 const FORMAT_TAG_CLASS: Record<ModpackInfo['format'], string> = {
   mrpack: 'tag-success',
   curseforge: 'tag-gold',
   fullpack: 'tag-cyan',
-  archive: 'tag-cyan'
+  archive: 'tag-cyan',
+  mmc: 'tag-gold'
 }
 
 interface ModpackModal {

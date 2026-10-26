@@ -1102,7 +1102,7 @@ export interface ModInstallPlan {
 
 /** 整合包探测信息（导入确认弹窗用） */
 export interface ModpackInfo {
-  format: 'mrpack' | 'curseforge' | 'fullpack' | 'archive'
+  format: 'mrpack' | 'curseforge' | 'fullpack' | 'archive' | 'mmc'
   /** 包内声明的名称 */
   innerName: string
   /** 压缩包文件名（去扩展名） */

@@ -106,6 +106,7 @@ interface PendingFile {
 type Parsed =
   | { kind: 'mrpack'; meta: PackMeta; files: PendingFile[] }
   | { kind: 'curseforge'; meta: PackMeta; files: { projectID: number; fileID: number }[] }
+  | { kind: 'mmc'; meta: PackMeta; files: PendingFile[] }
 
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 
@@ -282,20 +283,85 @@ async function detectFullpackEntry(zip: PackZip): Promise<FullpackDetected | nul
 
 type Detected =
   | { format: 'mrpack' | 'curseforge' }
+  | { format: 'mmc'; mmc: MmcDetected }
   | { format: 'fullpack'; full: FullpackDetected }
   | { format: 'archive'; archive: ArchiveDetected }
 
-/** 四格式探测：mrpack → curseforge → fullpack → 无清单整合包，均不命中抛错 */
+/** MultiMC / Prism Launcher / PCL 兼容整合包探测结果 */
+interface MmcDetected {
+  /** mmc-pack.json 所在目录前缀（zip 条目名，含尾斜杠；'' = zip 根） */
+  prefix: string
+  /** 游戏内容前缀：'.minecraft' 子目录（如 'xxx/.minecraft'，无尾斜杠）或 ''（zip 根即游戏内容） */
+  gamePrefix: string
+}
+
+/**
+ * 探测 MultiMC/Prism 整合包：zip 内任意嵌套前缀下的 mmc-pack.json + instance.cfg。
+ * 这是 PCL / HMCL / Prism Launcher / MultiMC 导出的常见格式，游戏内容位于
+ * 同前缀的 .minecraft 子目录或 zip 根（mods/config/options.txt 等）。
+ */
+async function detectMmcPack(zip: PackZip): Promise<MmcDetected | null> {
+  let found: MmcDetected | null = null
+  for (const e of zip.getEntries()) {
+    if (e.isDirectory) continue
+    const name = normEntry(e.entryName)
+    if (!/\/mmc-pack\.json$/i.test(name) && name !== 'mmc-pack.json') continue
+    const prefix = name.slice(0, name.length - 'mmc-pack.json'.length)
+    // 有 instance.cfg 更稳（PCL/HMCL 导出几乎都带）；没有时只要有游戏内容也接受
+    const hasInstanceCfg = zip.getEntries().some((x) => {
+      const n = normEntry(x.entryName)
+      return n === `${prefix}instance.cfg`
+    })
+    const gamePrefix = detectMmcGamePrefix(zip, prefix)
+    if (!gamePrefix && !hasInstanceCfg) continue
+    if (!gamePrefix) {
+      // instance.cfg 存在但找不到游戏内容：仍然识别，交给 parse 时友好报错
+    }
+    if (hasInstanceCfg || gamePrefix) {
+      found = { prefix, gamePrefix: gamePrefix ?? '' }
+      break
+    }
+  }
+  return found
+}
+
+/** MultiMC 游戏内容前缀：同前缀下 .minecraft 子目录优先，其次 zip 根游戏文件 */
+function detectMmcGamePrefix(zip: PackZip, prefix: string): string | null {
+  let minecraftPrefix: string | null = null
+  let rootGame = false
+  for (const e of zip.getEntries()) {
+    if (e.isDirectory) continue
+    const name = normEntry(e.entryName)
+    if (!name.startsWith(prefix)) continue
+    const rel = name.slice(prefix.length)
+    const lower = rel.toLowerCase()
+    const mi = lower.indexOf('.minecraft/')
+    if (mi === 0) {
+      minecraftPrefix = minecraftPrefix ?? `${prefix}${rel.slice(0, rel.indexOf('/'))}`
+      continue
+    }
+    const first = lower.split('/')[0] ?? ''
+    if (!rel.includes('/') && !rel) continue
+    const top = lower.split('/')[0] ?? ''
+    if (GAME_ROOT_HINTS.has(top)) rootGame = true
+    if (/\.minecraft$/i.test(top)) minecraftPrefix = minecraftPrefix ?? `${prefix}${top}`
+  }
+  return minecraftPrefix ?? (rootGame ? '' : null)
+}
+
+/** 五格式探测：mrpack → curseforge → multimc → fullpack → 无清单整合包，均不命中抛错 */
 async function detectPack(zip: PackZip): Promise<Detected> {
   const names = new Set(zip.getEntries().map((e) => normEntry(e.entryName)))
   if (names.has('modrinth.index.json')) return { format: 'mrpack' }
   if (names.has('manifest.json')) return { format: 'curseforge' }
+  const mmc = await detectMmcPack(zip)
+  if (mmc) return { format: 'mmc', mmc }
   const full = await detectFullpackEntry(zip)
   if (full) return { format: 'fullpack', full }
   const archive = detectArchivePack(zip)
   if (archive) return { format: 'archive', archive }
   throw new Error(
-    '无法识别的整合包格式（支持 Modrinth .mrpack、CurseForge .zip、含 versions 目录的完整客户端包，以及含 mods/config 的游戏目录压缩包）'
+    '无法识别的整合包格式（支持 Modrinth .mrpack、CurseForge .zip、MultiMC/Prism 整合包、含 versions 目录的完整客户端包，以及含 mods/config 的游戏目录压缩包）'
   )
 }
 
@@ -433,6 +499,115 @@ async function parseCurseForge(zip: PackZip): Promise<Parsed> {
       .filter((f) => !!f?.projectID && !!f?.fileID)
       .map((f) => ({ projectID: f.projectID as number, fileID: f.fileID as number }))
   }
+}
+
+// ---------------- MultiMC / Prism / PCL 整合包（mmc-pack.json） ----------------
+
+/** mmc-pack.json 组件 uid → 加载器（顺序敏感：fabric 先于 quilt，neoforge 先于 forge） */
+const MMC_LOADER_UIDS: Array<[string, LoaderName]> = [
+  ['net.fabricmc.fabric-loader', 'fabric'],
+  ['net.quiltmc.quilt-loader', 'quilt'],
+  ['net.neoforged', 'neoforge'],
+  ['net.minecraftforge', 'forge']
+]
+
+interface MmcPackJson {
+  formatVersion?: unknown
+  components?: Array<{ uid?: unknown; version?: unknown }>
+}
+
+/** MultiMC 元文件（zip 根游戏内容模式时解压需排除） */
+const MMC_META_FILE = /^mmc-pack\.json$|^instance\.cfg$|^\.minecraft\/?$|^[^/]*\.(png|jpg|jpeg|ico|icns)$/i
+
+/**
+ * 解析 MultiMC/Prism 整合包：
+ * mmc-pack.json 的 components 给出 Minecraft 版本与加载器，instance.cfg 的
+ * IntendedVersion 兜底；游戏文件都在 zip 内（.minecraft 子目录或 zip 根），
+ * 无需外部下载，安装时整体作为实例内容解压。
+ */
+async function parseMmcPack(zip: PackZip, det: MmcDetected): Promise<Parsed> {
+  let pack: MmcPackJson | null = null
+  try {
+    pack = await readEntryJson(zip, `${det.prefix}mmc-pack.json`) as MmcPackJson | null
+  } catch {
+    throw new Error('mmc-pack.json 已损坏，整合包无法解析')
+  }
+  if (!Array.isArray(pack?.components) || !pack.components.length) {
+    throw new Error('mmc-pack.json 缺少 components 列表，整合包无法解析')
+  }
+
+  let mcVersion: string | undefined
+  let loader: LoaderName | undefined
+  let loaderVersion: string | undefined
+  for (const c of pack.components) {
+    const uid = typeof c?.uid === 'string' ? c.uid : ''
+    const version = typeof c?.version === 'string' ? c.version : undefined
+    if (!uid || !version) continue
+    if (uid === 'net.minecraft' && !mcVersion) {
+      mcVersion = version
+      continue
+    }
+    for (const [match, name] of MMC_LOADER_UIDS) {
+      if (uid === match && !loader) {
+        loader = name
+        loaderVersion = version
+        break
+      }
+    }
+  }
+
+  // 部分导出包 components 缺 net.minecraft：用 instance.cfg 的 IntendedVersion 兜底
+  if (!mcVersion) {
+    try {
+      const cfgEntry = zip.getEntry(`${det.prefix}instance.cfg`) ?? zip.getEntry(`./${det.prefix}instance.cfg`)
+      if (cfgEntry) {
+        const text = (await cfgEntry.getData()).toString('utf8')
+        const m = /^IntendedVersion\s*=\s*(\S+)/m.exec(text)
+        if (m) mcVersion = m[1]
+      }
+    } catch {
+      /* cfg 读取失败走下方报错 */
+    }
+  }
+  if (!mcVersion) {
+    throw new Error('整合包清单缺少 Minecraft 版本（mmc-pack.json 无 net.minecraft 组件，instance.cfg 也无 IntendedVersion）')
+  }
+
+  // 游戏内容前缀：'' = zip 根（解压时排除元文件）；非空 = .minecraft 子目录
+  const overridesPrefix = det.gamePrefix === '' ? null : det.gamePrefix
+  return {
+    kind: 'mmc',
+    meta: {
+      name: '',
+      packVersion: pack.formatVersion != null ? String(pack.formatVersion) : '',
+      mcVersion,
+      loader,
+      loaderVersion,
+      // 空串 = 整包游戏内容模式（extractOverrides 特殊处理），null = 无 overrides
+      overridesPrefix: overridesPrefix ?? '',
+      clientOverridesPrefix: null
+    },
+    files: []
+  }
+}
+
+/** MultiMC 游戏内容写入实例目录：.minecraft 前缀模式或整包根模式（过滤元文件/垃圾） */
+async function extractMmcContent(
+  zip: PackZip,
+  det: MmcDetected,
+  instDir: string,
+  signal?: AbortSignal,
+  progress?: (done: number, total: number, name: string) => void
+): Promise<string[]> {
+  const exclude = (rel: string): boolean => {
+    const parts = rel.split('/').filter(Boolean)
+    if (!parts.length || parts.includes('..')) return true
+    if (rel === 'mmc-pack.json' || rel === 'instance.cfg') return true
+    if (parts.includes('__MACOSX')) return true
+    if (MMC_META_FILE.test(rel)) return true
+    return false
+  }
+  return extractOverrides(zip, det.gamePrefix === '' ? '' : det.gamePrefix, instDir, signal, progress, exclude)
 }
 
 // ---------------- 全量包（解压即玩） ----------------
@@ -828,29 +1003,49 @@ async function mapPool<T, R>(
   return out
 }
 
-/** 只解压 overrides 前缀下的普通文件；不安全路径或符号链接直接拒绝。 */
+/** 只解压 overrides 前缀下的普通文件；不安全路径或符号链接直接拒绝。
+ * prefix === '' 表示整包游戏内容（MultiMC zip 根模式），配合 exclude 过滤元文件。 */
 export async function extractOverrides(
   zip: PackZip,
   prefix: string | null,
   destDir: string,
   signal?: AbortSignal,
-  progress?: (done: number, total: number, name: string) => void
+  progress?: (done: number, total: number, name: string) => void,
+  exclude?: (rel: string) => boolean
 ): Promise<string[]> {
-  if (!prefix) return []
-  const pre = normEntry(prefix).replace(/\/+$/, '') + '/'
-  const extracted: string[] = []
-  const files = zip.getEntries().filter(entry => !entry.isDirectory && normEntry(entry.entryName).startsWith(pre)).map(entry => {
-    throwIfCancelled(signal)
-    const name = normEntry(entry.entryName)
-    const rel = name.slice(pre.length)
-    const dest = safeJoin(destDir, rel)
-    if (!dest) throw new Error(`overrides 包含不安全路径：${rel}`)
-    if (((entry.attr >>> 16) & 0o170000) === 0o120000) {
-      throw new Error(`overrides 不允许符号链接：${rel}`)
+  if (prefix === null || prefix === undefined) return []
+  const files: Array<{ entry: PackEntry; dest: string; rel: string }> = []
+  if (prefix === '') {
+    for (const entry of zip.getEntries()) {
+      if (entry.isDirectory) continue
+      throwIfCancelled(signal)
+      const name = normEntry(entry.entryName)
+      const rel = name
+      if (exclude?.(rel)) continue
+      const dest = safeJoin(destDir, rel)
+      if (!dest) throw new Error(`整合包包含不安全路径：${rel}`)
+      if (((entry.attr >>> 16) & 0o170000) === 0o120000) throw new Error(`整合包不允许符号链接：${rel}`)
+      if (entry.header.size > 512 * 1024 * 1024) throw new Error(`整合包单文件超过 512 MB：${rel}`)
+      files.push({ entry, dest, rel: rel.replace(/\\/g, '/') })
     }
-    if (entry.header.size > 512 * 1024 * 1024) throw new Error(`overrides 单文件超过 512 MB：${rel}`)
-    return { entry, dest, rel: rel.replace(/\\/g, '/') }
-  })
+  } else {
+    const pre = normEntry(prefix).replace(/\/+$/, '') + '/'
+    for (const entry of zip.getEntries()) {
+      if (entry.isDirectory) continue
+      throwIfCancelled(signal)
+      const name = normEntry(entry.entryName)
+      if (!name.startsWith(pre)) continue
+      const rel = name.slice(pre.length)
+      const dest = safeJoin(destDir, rel)
+      if (!dest) throw new Error(`overrides 包含不安全路径：${rel}`)
+      if (((entry.attr >>> 16) & 0o170000) === 0o120000) {
+        throw new Error(`overrides 不允许符号链接：${rel}`)
+      }
+      if (entry.header.size > 512 * 1024 * 1024) throw new Error(`overrides 单文件超过 512 MB：${rel}`)
+      files.push({ entry, dest, rel: rel.replace(/\\/g, '/') })
+    }
+  }
+  const extracted: string[] = []
   const directories = new Map<string, Promise<unknown>>()
   let lastReported = 0
   for (let cursor = 0; cursor < files.length;) {
@@ -1003,7 +1198,7 @@ export async function probeRecognizedModpack(filePath: string): Promise<ModpackI
   const zip = await openPackZip(filePath)
   try {
   const names = new Set(zip.getEntries().map(entry => normEntry(entry.entryName)))
-  if (names.has('modrinth.index.json') || names.has('manifest.json') || await detectFullpackEntry(zip)) {
+  if (names.has('modrinth.index.json') || names.has('manifest.json') || await detectMmcPack(zip) || await detectFullpackEntry(zip)) {
     return await modpackInfo(zip, filePath)
   }
   // 无清单整合包：作者直接把游戏目录压成 zip，导入时补充进用户指定的实例。
@@ -1039,6 +1234,24 @@ async function modpackInfo(zip: PackZip, filePath: string): Promise<ModpackInfo>
       innerName: meta.vid,
       fileName,
       version: meta.vid,
+      mcVersion: meta.mcVersion,
+      loader: meta.loader,
+      loaderVersion: meta.loaderVersion,
+      fileCount: entries.length,
+      downloadBytes: entries.reduce((sum, entry) => sum + entry.header.size, 0),
+      hasOverrides: false,
+      hasClientOverrides: false,
+      existingInstances: []
+    }
+  }
+  if (detected.format === 'mmc') {
+    const meta = (await parseMmcPack(zip, detected.mmc)).meta
+    const entries = zip.getEntries().filter((entry) => !entry.isDirectory)
+    return {
+      format: 'mmc',
+      innerName: fileName,
+      fileName,
+      version: meta.packVersion,
       mcVersion: meta.mcVersion,
       loader: meta.loader,
       loaderVersion: meta.loaderVersion,
@@ -1198,19 +1411,23 @@ async function installModpackInFolder(filePath: string, emit: ProgressEmit, opts
 
   // 2) 解析清单
   report({ stage: 'modpack', progress: 0, text: '解析整合包信息…' })
-  const parsed = await (detected.format === 'mrpack' ? parseMrpack(zip) : parseCurseForge(zip))
+  let parsed: Parsed
+  if (detected.format === 'mrpack') parsed = await parseMrpack(zip)
+  else if (detected.format === 'curseforge') parsed = await parseCurseForge(zip)
+  else if (detected.format === 'mmc') parsed = await parseMmcPack(zip, detected.mmc)
+  else throw new Error('不支持的整合包格式')
   throwIfCancelled(opts?.signal)
   const { meta } = parsed
   const loaderText = meta.loader ? ` + ${meta.loader} ${meta.loaderVersion ?? ''}` : ''
   report({
     stage: 'modpack',
     progress: 0.02,
-    text: `${meta.name}（MC ${meta.mcVersion}${loaderText}）`
+    text: `${meta.name || fileName}（MC ${meta.mcVersion}${loaderText}）`
   })
 
   // 3) 实例命名与冲突动作。更新/覆盖必须携带确认页的显式确认。
   const requestedName = sanitizeId(
-    opts?.instanceName?.trim() || (nameSource === 'inner' ? meta.name : fileName)
+    opts?.instanceName?.trim() || (nameSource === 'inner' && meta.name ? meta.name : fileName)
   )
   const action = opts?.conflictAction ?? 'new'
   let id: string
@@ -1258,7 +1475,8 @@ async function installModpackInFolder(filePath: string, emit: ProgressEmit, opts
       },
       async (signal) => {
         parallel.update('pack', { stage: 'modpack', progress: 0, text: '准备整合包文件清单' })
-        if (parsed.kind === 'mrpack') {
+        if (parsed.kind === 'mrpack' || parsed.kind === 'mmc') {
+          // mmc：游戏文件全部在包内，安装阶段整体解压，无需下载
           pending = parsed.files
         } else {
           // Match immutable identity before requesting a URL. Preserve bundled paths;
@@ -1395,7 +1613,10 @@ async function installModpackInFolder(filePath: string, emit: ProgressEmit, opts
     throwIfCancelled(opts?.signal)
     const extractionProgress = (start: number, span: number) => (done: number, total: number, name: string) =>
       report({ stage: 'modpack', progress: start + span * done / Math.max(1, total), text: `正在写入整合包配置 ${done}/${total} · ${name}` })
-    const overrideFiles = await extractOverrides(zip, meta.overridesPrefix, instDir, opts?.signal, extractionProgress(0.96, 0.02))
+    // MultiMC 包：游戏内容整体写入（.minecraft 前缀或 zip 根，过滤元文件）
+    const overrideFiles = detected.format === 'mmc'
+      ? await extractMmcContent(zip, detected.mmc, instDir, opts?.signal, extractionProgress(0.96, 0.02))
+      : await extractOverrides(zip, meta.overridesPrefix, instDir, opts?.signal, extractionProgress(0.96, 0.02))
     const clientOverrideFiles = await extractOverrides(
       zip,
       meta.clientOverridesPrefix ?? null,
@@ -1434,7 +1655,7 @@ async function installModpackInFolder(filePath: string, emit: ProgressEmit, opts
     }
 
     // 8) 完成
-    report({ stage: 'done', progress: 1, text: `${meta.name} 安装完成` })
+    report({ stage: 'done', progress: 1, text: `${meta.name || fileName} 安装完成` })
     return id
   } catch (e) {
     // 新装整目录清理；更新/覆盖则恢复开始前原子改名的完整实例备份。
