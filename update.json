@@ -1,8 +1,8 @@
 {
-  "latest": "1.1.76",
+  "latest": "1.1.77",
   "assetName": "MC-Launcher.exe",
-  "assetUrl": "https://github.com/baikune258/MC-Launcher/releases/download/v1.1.76/MC-Launcher.exe",
-  "publishedAt": "2026-10-26T03:47:09Z",
-  "body": "MC-Launcher v1.1.76\n2026-10-26 11:35（UTC+8）\n\n- 修复了一些BUG或问题",
-  "sha256SumsUrl": "https://github.com/baikune258/MC-Launcher/releases/download/v1.1.76/SHA256SUMS.txt"
+  "assetUrl": "https://github.com/baikune258/MC-Launcher/releases/download/v1.1.77/MC-Launcher.exe",
+  "publishedAt": "2026-10-26T07:00:24Z",
+  "body": "MC-Launcher v1.1.77\n2026-10-26 16:40（UTC+8）\n\n- 修复了一些BUG或问题",
+  "sha256SumsUrl": "https://github.com/baikune258/MC-Launcher/releases/download/v1.1.77/SHA256SUMS.txt"
 }
