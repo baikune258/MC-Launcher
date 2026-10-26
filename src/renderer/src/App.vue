@@ -48,7 +48,7 @@ import {
 import type { ReleaseInfo } from '@shared/types'
 import { QQ_GROUP_NUMBER } from '@shared/branding'
 import UpdateModal from './components/UpdateModal.vue'
-import { applyLaunchState, dismissTask, displayVersionName, enterEditMode, exitEditMode, finalizeTask, markNoticesRead, recordLastPlayed, refreshAccounts, refreshInstalled, resetProgressMono, stageLabel, store, toast, upsertTaskProgress } from './store'
+import { applyLaunchState, dismissTask, displayVersionName, enterEditMode, exitEditMode, finalizeTask, markNoticesRead, mpInstall, recordLastPlayed, refreshAccounts, refreshInstalled, resetProgressMono, stageLabel, store, toast, upsertTaskProgress } from './store'
 import type { ViewName } from './store'
 import type {
   CustomTheme,
@@ -635,6 +635,24 @@ function fmtPackBytes(bytes: number): string {
   return `${(bytes / 1024 ** 3).toFixed(2)} GB`
 }
 
+/** 字节 → 人类可读大小（全屏安装进度用） */
+function fmtBytes(bytes: number): string {
+  if (!bytes || bytes <= 0) return '0 B'
+  if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`
+  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`
+  return `${(bytes / 1024 ** 3).toFixed(2)} GB`
+}
+
+/** 剩余秒数 → 人类可读剩余时间（全屏安装进度用） */
+function formatEta(seconds: number): string {
+  if (seconds < 0 || !Number.isFinite(seconds)) return '计算中…'
+  const s = Math.round(seconds)
+  if (s < 60) return `${s} 秒`
+  const m = Math.floor(s / 60)
+  if (m < 60) return `${m} 分 ${s % 60} 秒`
+  return `${Math.floor(m / 60)} 小时 ${m % 60} 分`
+}
+
 function setMpNameSource(source: 'file' | 'inner') {
   mpModal.nameSource = source
   if (mpModal.info) mpModal.customName = source === 'inner' ? mpModal.info.innerName : mpModal.info.fileName
@@ -705,7 +723,9 @@ function closeModpackImport() {
   mpModal.open = false
 }
 
-/** 确认导入：主进程后台异步执行，完成/失败由 installDone 订阅统一提示 */
+/** 确认导入：PCL 式一键安装。有清单的整合包直接以包内名称安装到默认文件夹，
+ * 名称冲突自动加序号新建实例；无清单包（archive）向用户选定的实例补充文件。
+ * 后台任务进度经 progress 事件驱动全屏安装界面，完成/失败由 installDone 统一提示。 */
 function confirmModpackImport() {
   if (!mpModal.info) return
   // 无清单整合包：只向用户选定的既有实例补充文件，不新建实例
@@ -719,42 +739,47 @@ function confirmModpackImport() {
     }
     const filePath = mpModal.filePath
     mpModal.open = false
+    startPackInstall(mpModal.info.innerName || target.id)
     toast('开始导入整合包内容…', 'info')
     void installModpack(filePath, {
       targetFolder: target.folder,
       mergeIntoInstanceId: target.id
     }).catch((e) => {
+      mpInstall.active = false
       toast('整合包导入失败：' + errText(e), 'error')
     })
     return
   }
-  if (!mpModal.customName.trim()) {
-    mpModal.error = '实例名称不能为空'
-    return
-  }
-  if (mpModal.conflictAction === 'rename' && mpNameConflict.value) {
-    mpModal.error = `实例名称已存在：${mpNameConflict.value.id}，请改名或选择其他处理方式`
-    return
-  }
-  if (mpNeedsReplaceConfirm.value && (!mpModal.existingId || !mpModal.confirmReplace)) {
-    mpModal.error = '请选择现有实例并勾选影响范围确认'
-    return
-  }
   const filePath = mpModal.filePath
-  const nameSource = mpModal.nameSource
   mpModal.open = false
+  startPackInstall(mpModal.info.innerName || mpModal.info.fileName)
   toast('开始解析并安装整合包…', 'info')
   void installModpack(filePath, {
-    nameSource,
-    instanceName: mpModal.customName.trim(),
+    nameSource: 'inner',
     targetFolder: mpModal.targetFolder,
-    conflictAction: mpModal.conflictAction,
-    existingId: mpModal.existingId || undefined,
-    confirmReplace: mpNeedsReplaceConfirm.value && mpModal.confirmReplace,
+    conflictAction: 'new',
     keySyncOverride: mpModal.keySyncOverride
   }).catch((e) => {
+    mpInstall.active = false
     toast('整合包安装失败：' + errText(e), 'error')
   })
+}
+
+/** 打开 PCL 式全屏安装界面（名称取自包名/文件名，进度由 progress 事件持续刷新） */
+function startPackInstall(name: string) {
+  mpInstall.active = true
+  mpInstall.name = name
+  mpInstall.progress = 0
+  mpInstall.text = '正在准备安装…'
+  mpInstall.speed = undefined
+  mpInstall.etaSeconds = undefined
+  mpInstall.bytesDone = undefined
+  mpInstall.bytesTotal = undefined
+}
+
+/** 收起全屏安装界面（后台继续安装，可在下载中心查看进度） */
+function minimizePackInstall() {
+  mpInstall.active = false
 }
 
 /** 顶栏「导入」与拖入文件共用内容识别。 */
@@ -1171,6 +1196,17 @@ onMounted(async () => {
       store.progress = e
       if (e.versionId) store.installProgress[e.versionId] = e
       upsertTaskProgress(e)
+      // PCL 式全屏安装：整合包安装任务的进度实时刷新安装界面
+      if (e.stage === 'modpack' || (e.taskTitle ?? '').startsWith('导入整合包')) {
+        mpInstall.active = true
+        if (!mpInstall.name && e.taskTitle) mpInstall.name = (e.taskTitle.split('导入整合包 ')[1] ?? '').trim()
+        mpInstall.progress = e.overall ?? e.progress
+        mpInstall.text = e.text
+        mpInstall.speed = e.speed
+        mpInstall.etaSeconds = e.etaSeconds
+        if (e.bytesDone != null) mpInstall.bytesDone = e.bytesDone
+        if (e.bytesTotal != null) mpInstall.bytesTotal = e.bytesTotal
+      }
     }),
     onTaskDone((r) => {
       finalizeTask(r)
@@ -1206,11 +1242,19 @@ onMounted(async () => {
       if (store.progress?.taskId === r.taskId) store.progress = null
       finalizeTask(r)
       resetProgressMono(r.taskId)
+      // PCL 式全屏安装：任务结束（成功/失败/取消）关闭安装界面
+      const wasPackInstall = mpInstall.active || (store.tasks.find(t => t.id === r.taskId)?.title ?? '').startsWith('导入整合包')
+      if (mpInstall.active) mpInstall.active = false
       if (r.ok) {
         store.failedInstalls.delete(r.versionId)
-        const favorites = r.favoriteModsResult
-        toast(favorites ? `版本 ${r.versionId} 安装完成；${favorites.baseOnly ? '已按确认不安装收藏模组' : `已安装 ${favorites.installed} 项收藏模组及 ${favorites.dependencies} 项必要前置，跳过 ${favorites.skipped.length} 项`}。模组目录：${favorites.modsDirectory}` : `版本 ${r.versionId} 安装完成`, 'success')
-        void refreshInstalled()
+        if (wasPackInstall) {
+          toast('整合包安装完成', 'success')
+          void refreshInstalled()
+        } else {
+          const favorites = r.favoriteModsResult
+          toast(favorites ? `版本 ${r.versionId} 安装完成；${favorites.baseOnly ? '已按确认不安装收藏模组' : `已安装 ${favorites.installed} 项收藏模组及 ${favorites.dependencies} 项必要前置，跳过 ${favorites.skipped.length} 项`}。模组目录：${favorites.modsDirectory}` : `版本 ${r.versionId} 安装完成`, 'success')
+          void refreshInstalled()
+        }
       } else if (r.cancelled) {
         // 用户主动取消：不记失败、不弹错误（taskDone 已提示）
         void refreshInstalled()
@@ -1716,12 +1760,18 @@ onUnmounted(() => {
             <span data-ui="App:99b02870d974" v-if="mpModal.info.hasClientOverrides"> · client-overrides</span>
           </p>
 
-          <p data-ui="App:596a49ffb57e" class="mp-label" v-if="!mpIsArchive">目标游戏文件夹</p>
-          <select data-ui="App:274944e712ba" v-if="!mpIsArchive" v-model="mpModal.targetFolder" class="select" @change="onMpTargetFolderChange">
-            <option v-for="folder in store.settings?.folders || []" :key="folder.path" :value="folder.path">
-              {{ folder.name }}{{ folder.isDefault ? '（默认）' : '' }} · {{ folder.path }}
-            </option>
-          </select>
+          <!-- PCL 式一键安装：有清单的整合包直接装到默认文件夹，名称用包名、冲突自动加序号新建实例，不再让用户选文件夹/命名/冲突策略 -->
+          <template v-if="!mpIsArchive">
+            <div data-ui="App:mp-oneclick-hint" class="mp-impact mp-oneclick-hint">
+              将直接以「{{ mpModal.info.innerName || mpModal.info.fileName }}」为实例名安装到默认游戏文件夹。
+              若已有同名实例会自动加序号新建，不会覆盖现有内容。
+            </div>
+            <!-- 默认按键冲突：检测到作者预设键位且已开启默认按键同步时，给出替换选项（默认不替换） -->
+            <label data-ui="App:0e88d6c50d0d" v-if="mpModal.info?.hasPresetKeys && store.settings?.keySync" class="mp-keysync-opt">
+              <input data-ui="App:e3245af7e07a" v-model="mpModal.keySyncOverride" type="checkbox" />
+              <span data-ui="App:25de5e67e1b9">该整合包含作者预设键位（options.txt）。用启动器默认按键替换预设键位；其余设置保留。不勾选则保留作者预设。</span>
+            </label>
+          </template>
 
           <!-- 无清单整合包：没有版本信息，只能把内容补充进既有实例 -->
           <template v-if="mpIsArchive">
@@ -1732,7 +1782,7 @@ onUnmounted(() => {
               </option>
             </select>
             <div data-ui="App:archive-target-impact" class="mp-impact">
-              该压缩包没有整合包清单（非 Modrinth / CurseForge 格式），将把包内的 mods、config 等游戏文件补充进所选实例。
+              该压缩包没有整合包清单（非 Modrinth / CurseForge / MultiMC 格式），将把包内的 mods、config 等游戏文件补充进所选实例。
               已存在的同名文件不会覆盖，存档、设置与截图不受影响。
             </div>
             <p data-ui="App:archive-target-empty" v-if="!mpArchiveTargets.length" class="mp-error">
@@ -1740,82 +1790,11 @@ onUnmounted(() => {
             </p>
           </template>
 
-          <template v-if="!mpIsArchive">
-          <p data-ui="App:7b097008a36b" class="mp-label">实例命名</p>
-          <div data-ui="App:72a2299fc011" class="mp-name-opts">
-            <button data-ui="App:3a719b866a06"
-              class="mp-name-opt"
-              :class="{ active: mpModal.nameSource === 'file' }"
-              @click="setMpNameSource('file')"
-            >
-              <span data-ui="App:b8da1ddfc48f" class="mp-radio"></span>
-              <span data-ui="App:ffd1edc7712c" class="mp-name-text">
-                <span data-ui="App:46b21df17f0a" class="mp-name-label">使用压缩包文件名</span>
-                <span data-ui="App:70d3893f031f" class="mp-name-value">{{ mpModal.info.fileName }}</span>
-              </span>
-            </button>
-            <button data-ui="App:a2e1c9d8bd28"
-              class="mp-name-opt"
-              :class="{ active: mpModal.nameSource === 'inner' }"
-              @click="setMpNameSource('inner')"
-            >
-              <span data-ui="App:ebce50ef2232" class="mp-radio"></span>
-              <span data-ui="App:6471e9d8a5fe" class="mp-name-text">
-                <span data-ui="App:5e013419bf1c" class="mp-name-label">使用整合包名称</span>
-                <span data-ui="App:787ec3b759bb" class="mp-name-value">{{ mpModal.info.innerName }}</span>
-              </span>
-            </button>
-          </div>
-          <input data-ui="App:2b301f17a937" v-model="mpModal.customName" class="input mp-custom-name" maxlength="120" placeholder="自定义实例名称" @input="mpModal.confirmReplace = false; mpModal.error = ''" />
-
-          <div data-ui="App:fc46c9326814" v-if="mpRelatedExisting.length" class="mp-conflict">
-            <strong data-ui="App:e35ef0415ba0">检测到实例冲突或相同整合包版本</strong>
-            <span data-ui="App:e671a36e2cab">
-              {{ mpRelatedExisting.map(item => `${item.id}${item.samePackVersion ? '（同包同版本）' : ''}`).join('、') }}
-            </span>
-            <div data-ui="App:109bf3c86358" class="mp-conflict-actions">
-              <label data-ui="App:f85325e79d42"><input data-ui="App:00222a19c9fa" v-model="mpModal.conflictAction" type="radio" value="rename" @change="onMpConflictActionChange" /> 重新命名</label>
-              <label data-ui="App:acbdff7eee51"><input data-ui="App:614b9af91bd3" v-model="mpModal.conflictAction" type="radio" value="new" @change="onMpConflictActionChange" /> 作为新实例安装（自动加序号）</label>
-              <label data-ui="App:89f12da61d4f"><input data-ui="App:6dc0ad1f778f" v-model="mpModal.conflictAction" type="radio" value="update" @change="onMpConflictActionChange" /> 更新现有实例</label>
-              <label data-ui="App:9a75f39d2361"><input data-ui="App:2e73bdfaa685" v-model="mpModal.conflictAction" type="radio" value="overwrite" @change="onMpConflictActionChange" /> 覆盖安装</label>
-            </div>
-
-            <template v-if="mpNeedsReplaceConfirm">
-              <select data-ui="App:831130030ba1" v-model="mpModal.existingId" class="select mp-existing-select">
-                <option v-for="item in mpExistingInFolder" :key="item.id" :value="item.id">
-                  {{ item.id }}{{ item.samePackVersion ? ' · 同一整合包版本' : '' }}
-                </option>
-              </select>
-              <div data-ui="App:5ea11cdf2f61" class="mp-impact" :class="{ danger: mpModal.conflictAction === 'overwrite' }">
-                <template v-if="mpModal.conflictAction === 'update'">
-                  将重建包管理文件并恢复用户存档、配置及非包管理文件；同名的新包 MOD 优先。操作失败会恢复完整备份。
-                </template>
-                <template v-else>
-                  将重建实例包文件；存档、配置、截图、资源包及可识别的用户 MOD 会保留，其他未知顶层内容可能被移除。操作失败会恢复完整备份。
-                </template>
-              </div>
-              <label data-ui="App:76acdea2ae5a" class="mp-replace-confirm">
-                <input data-ui="App:8c2c4f6d4693" v-model="mpModal.confirmReplace" type="checkbox" />
-                <span data-ui="App:84709e2c73a5">我已确认上述影响范围，并同意{{ mpModal.conflictAction === 'update' ? '更新' : '覆盖' }}所选实例。</span>
-              </label>
-            </template>
-          </div>
-
-          <!-- 默认按键冲突：检测到作者预设键位且已开启默认按键同步时，给出替换选项（默认不替换） -->
-          <label data-ui="App:0e88d6c50d0d" v-if="mpModal.info?.hasPresetKeys && store.settings?.keySync" class="mp-keysync-opt">
-            <input data-ui="App:e3245af7e07a" v-model="mpModal.keySyncOverride" type="checkbox" />
-            <span data-ui="App:25de5e67e1b9">该整合包含作者预设键位（options.txt）。用启动器默认按键替换预设键位；其余设置保留。不勾选则保留作者预设。</span>
-          </label>
-          </template>
-
-          <p data-ui="App:9feeb075e091" v-if="!mpIsArchive && mpNameConflict && mpModal.conflictAction === 'rename'" class="mp-error">
-            名称「{{ mpModal.customName }}」已存在，请重新命名或选择其他处理方式。
-          </p>
           <p data-ui="App:88ee270d21af" v-if="mpModal.error" class="mp-error">{{ mpModal.error }}</p>
 
           <div data-ui="App:ca67c0af2cc9" class="mp-actions">
             <button data-ui="App:20064d25fb9e" class="btn btn-ghost" @click="closeModpackImport">取消</button>
-            <button data-ui="App:1cef44943a65" class="btn btn-gold" @click="confirmModpackImport">确认导入</button>
+            <button data-ui="App:1cef44943a65" class="btn btn-gold" :disabled="mpIsArchive && !mpArchiveTargets.length" @click="confirmModpackImport">{{ mpIsArchive ? '确认导入' : '开始安装' }}</button>
           </div>
         </template>
 
@@ -1826,6 +1805,30 @@ onUnmounted(() => {
             <button data-ui="App:4ff5fe62cac3" class="btn btn-ghost" @click="closeModpackImport">关闭</button>
           </div>
         </template>
+      </div>
+    </div>
+  </Teleport>
+
+  <!-- PCL 式整合包安装：全屏安装界面（后台继续，进度实时刷新） -->
+  <Teleport to="body">
+    <div data-ui="App:mpinstall-overlay" v-if="mpInstall.active" class="modal-mask pack-install-mask" @pointerdown.self.prevent>
+      <div data-ui="App:mpinstall-panel" class="pack-install-panel" role="dialog" aria-modal="true" aria-label="整合包安装进度">
+        <div class="pack-install-header">
+          <span class="pack-install-badge">整合包</span>
+          <button class="btn btn-ghost btn-sm pack-install-min" @click="minimizePackInstall">后台运行</button>
+        </div>
+        <h2 class="pack-install-name" :title="mpInstall.name">{{ mpInstall.name || '正在安装…' }}</h2>
+        <p class="pack-install-stage">{{ mpInstall.text || '正在准备…' }}</p>
+        <div class="pack-install-bar">
+          <div class="pack-install-fill" :style="{ width: Math.round(Math.min(mpInstall.progress, 1) * 100) + '%' }"></div>
+        </div>
+        <div class="pack-install-meta">
+          <span>{{ Math.round(Math.min(mpInstall.progress, 1) * 100) }}%</span>
+          <span v-if="mpInstall.speed">· {{ formatSpeed(mpInstall.speed) }}</span>
+          <span v-if="mpInstall.etaSeconds != null">· 剩余 {{ formatEta(mpInstall.etaSeconds) }}</span>
+          <span v-else-if="mpInstall.bytesDone != null && mpInstall.bytesTotal != null">· {{ fmtBytes(mpInstall.bytesDone) }} / {{ fmtBytes(mpInstall.bytesTotal) }}</span>
+        </div>
+        <p class="muted pack-install-tip">安装全程在后台进行，可最小化窗口继续浏览启动器其他内容</p>
       </div>
     </div>
   </Teleport>
@@ -2747,5 +2750,74 @@ onUnmounted(() => {
   justify-content: flex-end;
   gap: var(--space-3);
   margin-top: var(--space-5);
+}
+
+/* ---------------- PCL 式整合包安装：全屏安装界面 ---------------- */
+.pack-install-mask {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pack-install-panel {
+  width: min(520px, calc(100vw - 48px));
+  padding: var(--space-6);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  box-shadow: 0 18px 60px rgb(0 0 0 / 0.45);
+}
+.pack-install-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+.pack-install-badge {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: var(--on-gold, #201a10);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+.pack-install-min {
+  cursor: pointer;
+}
+.pack-install-name {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pack-install-stage {
+  margin: 0 0 var(--space-5);
+  color: var(--text-secondary);
+  line-height: 1.6;
+  min-height: 1.6em;
+}
+.pack-install-bar {
+  height: 12px;
+  border-radius: 999px;
+  background: var(--card-2);
+  overflow: hidden;
+}
+.pack-install-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--gold), var(--gold-strong, var(--gold)));
+  transition: width 0.25s ease;
+}
+.pack-install-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+.pack-install-tip {
+  margin-top: var(--space-4);
+  font-size: var(--text-sm);
 }
 </style>

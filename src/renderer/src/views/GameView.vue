@@ -34,7 +34,7 @@ import {
   setVersionResolution,
   updateVersionCategories
 } from '../api'
-import { selectInstance, applyLaunchState, displayVersionName, displayVersionSub, fmtLastPlayed, isFavorite, progressMono, refreshInstalled, renameLastPlayed, sortWithFavorite, store, toast, toggleFavorite, versionIconUrl } from '../store'
+import { selectInstance, applyLaunchState, communityPackPreset, displayVersionName, displayVersionSub, fmtLastPlayed, isFavorite, progressMono, refreshInstalled, renameLastPlayed, sortWithFavorite, store, toast, toggleFavorite, versionIconUrl } from '../store'
 import { instanceLaunchBusy } from '@shared/launchTracking'
 import ConfirmModal from '../components/ConfirmModal.vue'
 import IconPickerModal from '../components/IconPickerModal.vue'
@@ -744,6 +744,13 @@ async function goManage(view: 'mods' | 'packs' | 'shaders') {
   store.currentView = view
 }
 
+/** 打开整合包下载库（社区资源页预设整合包分类、最多下载排序） */
+function goPackLibrary() {
+  communityPackPreset.kind = 'modpack'
+  communityPackPreset.sort = 'downloads'
+  store.currentView = 'community'
+}
+
 // ---------------- 实例重命名 ----------------
 const renameModal = reactive({ open: false, id: '', folder: '', name: '', error: '', busy: false })
 
@@ -1047,6 +1054,18 @@ async function confirmIsolation() {
       <p v-if="folderScan?.errors.length" class="folder-scan-error" role="status">{{ folderScan.errors[0] }}</p>
     </section>
 
+    <!-- 整合包库入口：PCL 式一键浏览下载整合包 -->
+    <button v-if="tab === 'download'" class="card pack-library-banner" data-ui="games:pack-library" @click="goPackLibrary">
+      <span class="pack-library-icon">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/><path d="M7.5 5.5 12 8l4.5-2.5"/></svg>
+      </span>
+      <span class="pack-library-text">
+        <strong>整合包库</strong>
+        <span class="muted">浏览 Modrinth 整合包，选中即可一键下载安装</span>
+      </span>
+      <span class="pack-library-go">去看看 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></span>
+    </button>
+
     <!-- 控制行：Tab + 搜索/筛选/刷新/下载源（同一行横向排布，窄窗口自动换行） -->
     <div v-if="tab === 'download'" class="game-controls">
       <div v-if="tab === 'download'" class="toolbar">
@@ -1215,7 +1234,7 @@ async function confirmIsolation() {
               <span v-if="categoryLabel(v)" class="instance-category" :title="categoryLabel(v)">{{ categoryLabel(v) }}</span>
               <span :title="v.gameDirectory || v.folder">{{ v.isolated ? '已隔离' : '共享目录' }}</span>
               <span v-if="v.incomplete" class="error">下载未完成</span><span v-else-if="v.failed" class="error">安装失败</span>
-              <span v-else-if="v.modpackName" :title="v.modpackName">整合包</span>
+              <span v-else-if="v.modpackName" class="pack-badge" :title="'整合包：' + v.modpackName">{{ v.modpackName }}</span>
             </div>
           </div>
           <div class="instance-commands">
@@ -1679,6 +1698,57 @@ async function confirmIsolation() {
   }
 }
 
+/* 整合包库入口横幅（PCL 式：一键浏览下载整合包） */
+.pack-library-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  margin: 0 0 var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease, transform 0.12s ease;
+}
+.pack-library-banner:hover {
+  border-color: var(--gold);
+  transform: translateY(-1px);
+}
+.pack-library-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--gold) 18%, transparent);
+  color: var(--gold);
+}
+.pack-library-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.pack-library-text strong {
+  font-size: var(--text-md);
+}
+.pack-library-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  color: var(--gold);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 /* 控制行：Tab 分段 + 工具（同一行，窄窗口自动换行） */
 .game-controls {
   display: flex;
@@ -1913,6 +1983,19 @@ async function confirmIsolation() {
 .inst-names .version-id { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 元信息区（标签）：可收缩，省略号兜底，不挤压操作区 */
 .installed-row > .tag { max-width: 200px; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 整合包标签：金色醒目徽标，直接显示包名 */
+.pack-badge {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: var(--on-gold, #201a10);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
 .iso-switch { flex-shrink: 0; white-space: nowrap; }
 .mirror-toggle {
   cursor: pointer;

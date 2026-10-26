@@ -124,6 +124,21 @@ export const store = reactive({
   toasts: [] as ToastItem[]
 })
 
+/** 整合包安装全屏进度（PCL 式安装界面状态；App.vue 监听 progress/installDone 维护） */
+export const mpInstall = reactive({
+  active: false,
+  name: '',
+  progress: 0,
+  text: '',
+  speed: undefined as number | undefined,
+  etaSeconds: undefined as number | undefined,
+  bytesDone: undefined as number | undefined,
+  bytesTotal: undefined as number | undefined
+})
+
+/** 社区整合包库预设（游戏版本页「整合包库」入口写入，CommunityView 挂载时消费后清空） */
+export const communityPackPreset = reactive<{ kind: 'modpack'; sort: 'downloads' } | null>(null)
+
 const normalizeFolder = (value = '') => value.replaceAll('\\', '/').replace(/\/$/, '').toLowerCase()
 export const activeInstalled = computed(() => store.installed.filter(v => !v.folder || normalizeFolder(v.folder) === normalizeFolder(store.settings?.activeFolder || store.settings?.gameDir)))
 export const selectedInstance = computed(() => activeInstalled.value.find(v => v.id === store.resourceVersionId) ?? activeInstalled.value[0])

@@ -2,7 +2,7 @@
 import ContentSkeleton from '../components/ContentSkeleton.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { communityFiles, communitySearch, errText, getManifest, getModTargets, listHostServers } from '../api'
-import { store, toast, selectedInstance, displayVersionName as versionLabel } from '../store'
+import { store, toast, selectedInstance, displayVersionName as versionLabel, communityPackPreset } from '../store'
 import { instanceKey } from '@shared/modCompatibility'
 import { communityFileMatchesInstance, usesCommunityLoader } from '@shared/communityPolicy'
 import { mcmodSearchUrl } from '@shared/communityLinks'
@@ -153,6 +153,15 @@ const versionInput = ref(previousSession?.versionInput ?? '')
 onMounted(() => void loadManifest())
 
 const query = reactive(initialCommunityQuery(previousSession))
+// 「整合包库」入口预设：来自游戏版本页，打开即定位到整合包分类并按下载量排序
+let packPresetApplied = false
+if (communityPackPreset.kind) {
+  query.kind = communityPackPreset.kind
+  query.sort = communityPackPreset.sort
+  packPresetApplied = true
+  communityPackPreset.kind = null
+  communityPackPreset.sort = null
+}
 const versionSelection = reactive(initialCommunityVersionSelection(previousSession))
 const installedVersionOptions = computed(() => store.installed.filter(usableCommunityInstance).map(v => ({
   value: instanceKey(v), label: versionLabel(v), description: `Minecraft ${v.mcVersion} · ${v.loader || '原版'} · ${v.folder}`
@@ -341,7 +350,7 @@ function onReset() {
 onMounted(async () => {
   // A route-local snapshot keeps the query, loaded pages and scroll without retaining DOM.
   const newKeyword = store.searchKeyword.trim()
-  if (!previousSession || (newKeyword && newKeyword !== previousSession.topKeyword.trim())) { query.keyword = newKeyword; void doSearch(true) }
+  if (packPresetApplied || !previousSession || (newKeyword && newKeyword !== previousSession.topKeyword.trim())) { query.keyword = newKeyword; void doSearch(true) }
   else {
     await nextTick()
     const content = document.querySelector<HTMLElement>('.content')
