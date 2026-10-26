@@ -624,6 +624,18 @@ const mpRelatedExisting = computed(() => {
   )
   return [...new Map(result.map((item) => [item.id, item])).values()]
 })
+
+/** 同文件夹内已安装的同整合包同版本实例：重复导入时提示已安装，不再重复安装 */
+const mpSamePackInstalled = computed(() =>
+  mpExistingInFolder.value.find((item) => item.samePackVersion) ?? null
+)
+
+/** 同名但版本/内容不同的已装实例：提示将新建带序号实例，保护原内容不被覆盖 */
+const mpSameNameInstalled = computed(() =>
+  mpExistingInFolder.value.find(
+    (item) => !item.samePackVersion && normalizeMpName(item.id) === normalizeMpName(mpModal.info?.innerName || mpModal.info?.fileName || '')
+  ) ?? null
+)
 const mpNeedsReplaceConfirm = computed(
   () => mpModal.conflictAction === 'update' || mpModal.conflictAction === 'overwrite'
 )
@@ -1762,9 +1774,20 @@ onUnmounted(() => {
 
           <!-- PCL 式一键安装：有清单的整合包直接装到默认文件夹，名称用包名、冲突自动加序号新建实例，不再让用户选文件夹/命名/冲突策略 -->
           <template v-if="!mpIsArchive">
-            <div data-ui="App:mp-oneclick-hint" class="mp-impact mp-oneclick-hint">
+            <!-- 已安装检测：同包同版本已存在 → 提示无需重复安装（默认保护既有存档与配置，不覆盖） -->
+            <div v-if="mpSamePackInstalled" data-ui="App:mp-installed-hint" class="mp-impact mp-installed-hint">
+              <strong>该整合包已安装：{{ mpSamePackInstalled.id }}</strong>
+              <span>无需重复安装。若要更新为本次导入的版本，请先在「游戏版本 → 已安装」里删除旧实例，再重新导入；直接安装会新建带序号的实例，不会覆盖现有内容。</span>
+            </div>
+            <!-- 同名不同版本：仍可安装，但会新建带序号实例，原实例内容不受影响 -->
+            <div v-else-if="mpSameNameInstalled" data-ui="App:mp-samename-hint" class="mp-impact mp-oneclick-hint">
+              已检测到同名实例「{{ mpSameNameInstalled.id }}」。本次将以「{{ mpModal.info.innerName || mpModal.info.fileName }} (2)」这样的新实例名安装，
+              不会覆盖原实例，可随时在已安装列表删除不需要的版本。
+            </div>
+            <!-- 全新安装 -->
+            <div v-else data-ui="App:mp-oneclick-hint" class="mp-impact mp-oneclick-hint">
               将直接以「{{ mpModal.info.innerName || mpModal.info.fileName }}」为实例名安装到默认游戏文件夹。
-              若已有同名实例会自动加序号新建，不会覆盖现有内容。
+              若安装过程中出现同名实例会自动加序号新建，不会覆盖现有内容。
             </div>
             <!-- 默认按键冲突：检测到作者预设键位且已开启默认按键同步时，给出替换选项（默认不替换） -->
             <label data-ui="App:0e88d6c50d0d" v-if="mpModal.info?.hasPresetKeys && store.settings?.keySync" class="mp-keysync-opt">
@@ -1793,8 +1816,14 @@ onUnmounted(() => {
           <p data-ui="App:88ee270d21af" v-if="mpModal.error" class="mp-error">{{ mpModal.error }}</p>
 
           <div data-ui="App:ca67c0af2cc9" class="mp-actions">
-            <button data-ui="App:20064d25fb9e" class="btn btn-ghost" @click="closeModpackImport">取消</button>
-            <button data-ui="App:1cef44943a65" class="btn btn-gold" :disabled="mpIsArchive && !mpArchiveTargets.length" @click="confirmModpackImport">{{ mpIsArchive ? '确认导入' : '开始安装' }}</button>
+            <template v-if="mpSamePackInstalled && !mpIsArchive">
+              <button data-ui="App:mp-installed-close" class="btn btn-gold" @click="closeModpackImport">已安装，不重复安装</button>
+              <button data-ui="App:mp-installed-force" class="btn btn-ghost" @click="confirmModpackImport">仍要新建实例</button>
+            </template>
+            <template v-else>
+              <button data-ui="App:20064d25fb9e" class="btn btn-ghost" @click="closeModpackImport">取消</button>
+              <button data-ui="App:1cef44943a65" class="btn btn-gold" :disabled="mpIsArchive && !mpArchiveTargets.length" @click="confirmModpackImport">{{ mpIsArchive ? '确认导入' : '开始安装' }}</button>
+            </template>
           </div>
         </template>
 
@@ -2738,6 +2767,17 @@ onUnmounted(() => {
 }
 .mp-impact.danger {
   color: var(--danger);
+}
+/* 已安装检测提示：醒目但非错误 */
+.mp-installed-hint {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: color-mix(in srgb, var(--success, #3fbf6f) 14%, var(--card-2));
+  border: 1px solid color-mix(in srgb, var(--success, #3fbf6f) 40%, transparent);
+}
+.mp-installed-hint strong {
+  color: var(--success, #3fbf6f);
 }
 .mp-error {
   font-size: var(--text-sm);
