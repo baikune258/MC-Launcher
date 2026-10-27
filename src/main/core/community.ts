@@ -44,9 +44,9 @@ export const withCommunitySignal=<T>(signal:AbortSignal|undefined,run:()=>Promis
 
 // ---------------- 基础请求 ----------------
 
-async function fetchJson(url: string, headers: Record<string, string> = {}): Promise<unknown> {
+async function fetchJson(url: string, headers: Record<string, string> = {}, timeoutMs?: number): Promise<unknown> {
   const signal=requestSignal.getStore();signal?.throwIfAborted()
-  const res = await fetch(url, { signal: signal?AbortSignal.any([signal,AbortSignal.timeout(TIMEOUT)]):AbortSignal.timeout(TIMEOUT), headers: { ...UA, ...headers } })
+  const res = await fetch(url, { signal: signal?AbortSignal.any([signal,AbortSignal.timeout(timeoutMs ?? TIMEOUT)]):AbortSignal.timeout(timeoutMs ?? TIMEOUT), headers: { ...UA, ...headers } })
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${url}`)
   return res.json()
 }
@@ -54,13 +54,15 @@ async function fetchJson(url: string, headers: Record<string, string> = {}): Pro
 // ---------------- Modrinth ----------------
 
 const MR_BASES = ['https://api.modrinth.com/v2', 'https://mod.mcimirror.top/modrinth/v2']
+/** 官方源在国内经常被墙/超时：首源给短超时快速失败，立即落到国内镜像；镜像给足 30s */
+const MR_FAST_TIMEOUT = 8000
 
 /** 主备互备请求 Modrinth */
 async function mrFetch(p: string): Promise<unknown> {
   let lastErr: unknown = null
-  for (const base of MR_BASES) {
+  for (let i = 0; i < MR_BASES.length; i++) {
     try {
-      return await fetchJson(base + p)
+      return await fetchJson(MR_BASES[i] + p, {}, i === 0 ? MR_FAST_TIMEOUT : undefined)
     } catch (e) {
       lastErr = e
     }
