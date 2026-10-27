@@ -937,7 +937,7 @@ onUnmounted(() => {
 .account-panel, .skin-panel { border: 1px solid var(--border); border-radius: 15px; background: var(--surface-content); box-shadow: var(--shadow); }
 .account-panel { min-height: 146px; padding: 18px; }
 .account-head { display: flex; align-items: center; gap: 13px; }
-.account-head :deep(.mc-avatar) { border-radius: 12px; box-shadow: 0 0 0 4px color-mix(in srgb, var(--text) 8%, transparent); }
+.account-head :deep(.mc-avatar) { border-radius: 12px; }
 .account-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 5px; }
 .account-copy strong { overflow: hidden; font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
 .account-copy span { display: flex; align-items: center; gap: 7px; color: var(--accent-2); font-size: 11px; }

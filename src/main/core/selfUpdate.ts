@@ -197,14 +197,15 @@ async function fetchRawUpdate(signal?: AbortSignal): Promise<ReleaseInfo | null>
     if (!/^\d+\.\d+\.\d+$/.test(version)) return null
     const name = updateAssetName(version)
     // v1.1.42 起 Windows 安装包固定命名为 MC-Launcher.exe（版本号只在启动器内显示）。
-    // 仓库根 update.json 仍需指向带版本号的兼容资产名，让 ≤1.1.41 旧版本（其二进制
-    // 仍按 MC-Launcher-<版本>.exe 查找）在 API 通道失败时也能走通备用通道。
+    // 为让任意旧版本（≤1.1.41 按 MC-Launcher-<版本>.exe 查找、≥1.1.42 按 MC-Launcher.exe 查找）
+    // 都能走通备用通道更新到最新版，两种资产名均接受；assetUrl 缺失时按仓库规范拼接，
+    // sha256SumsUrl 缺失时同样按规范拼接，不因字段格式差异阻断「每个版本都能更新到最新版本」。
     const legacyName = process.platform === 'win32' ? `MC-Launcher-${version}.exe` : null
-    const assetName = j.assetName === name || j.assetName === legacyName ? j.assetName : null
-    if (!assetName) return null
+    const assetName = j.assetName === name || j.assetName === legacyName ? j.assetName : (legacyName ?? name)
     const expectedUrl = `https://github.com/${GITHUB_REPO}/releases/download/v${version}/${assetName}`
-    if (j.assetUrl !== expectedUrl) return null
-    if (typeof j.sha256SumsUrl !== 'string' || !/^https:\/\/github\.com\/[^/]+\/[^/]+\/releases\/download\/v[\d.]+\/SHA256SUMS\.txt$/.test(j.sha256SumsUrl)) return null
+    if (j.assetUrl && j.assetUrl !== expectedUrl) return null
+    const expectedSumsUrl = `https://github.com/${GITHUB_REPO}/releases/download/v${version}/SHA256SUMS.txt`
+    if (j.sha256SumsUrl && j.sha256SumsUrl !== expectedSumsUrl) return null
     const release: ReleaseInfo = {
       version,
       publishedAt: String(j.publishedAt ?? ''),

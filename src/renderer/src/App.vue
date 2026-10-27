@@ -1934,7 +1934,6 @@ onUnmounted(() => {
   flex-shrink: 0;
   image-rendering: pixelated;
   border-radius: var(--radius-md);
-  border: 1px solid rgba(255,255,255,.26);
   box-shadow: 0 3px 12px rgba(0,0,0,.18);
 }
 .logo-text {
