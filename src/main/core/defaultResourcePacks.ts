@@ -9,7 +9,7 @@ import { prepareResourcePackArchive } from './resourcePackArchive'
 
 const root = () => path.join(app.getPath('userData'), 'default-resourcepacks')
 const manifest = () => path.join(root(), 'packs.json')
-const managedName = (p: DefaultResourcePack) => `KAMUCL-default-${p.id}-${p.name}`
+const managedName = (p: DefaultResourcePack) => `MC-Launcher-default-${p.id}-${p.name}`
 const hash = (data: Buffer) => crypto.createHash('sha256').update(data).digest('hex')
 const optionKeys = ['resourcePacks', 'incompatibleResourcePacks'] as const
 type PackOptionKey = typeof optionKeys[number]
@@ -196,7 +196,7 @@ export interface ResourcePackSyncOptions {
   /** Capture before launch-time defaults can add the built-in high_contrast pack. */
   resourcePacksConfigured?: boolean
 }
-const isManagedName = (name: unknown): name is string => typeof name === 'string' && /^(?:file\/)?KAMUCL-default-[a-f0-9]{64}-[^/\\\x00-\x1f]+\.zip$/i.test(name)
+const isManagedName = (name: unknown): name is string => typeof name === 'string' && /^(?:file\/)?(?:KAMUCL|MC-Launcher)-default-[a-f0-9]{64}-[^/\\\x00-\x1f]+\.zip$/i.test(name)
 function aliases(name: string): string[] {
   const bare = name.startsWith('file/') ? name.slice(5) : name
   return [bare, 'file/' + bare]
