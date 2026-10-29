@@ -53,10 +53,11 @@ async function fetchJson(url: string, headers: Record<string, string> = {}, time
 
 // ---------------- Modrinth ----------------
 
-// 国内网络下官方源常被墙/极慢：镜像优先（国内公益镜像，响应更快更稳），官方源兜底。
-// 镜像 12s 超时、官方 8s 超时，全部失败才抛错。
-const MR_BASES = ['https://mod.mcimirror.top/modrinth/v2', 'https://api.modrinth.com/v2']
-const MR_TIMEOUTS = [12000, 8000]
+// 国内网络下官方源常被墙/极慢：镜像优先（国内公益镜像，响应更快更稳），官方源兜底，
+// 另加通用加速代理 get.2sb.org（面向国内，海外不可达时自动跳过）。
+// 依次 12s / 8s / 15s 超时，全部失败才抛错。
+const MR_BASES = ['https://mod.mcimirror.top/modrinth/v2', 'https://api.modrinth.com/v2', 'https://get.2sb.org/https://api.modrinth.com/v2']
+const MR_TIMEOUTS = [12000, 8000, 15000]
 
 /** 主备互备请求 Modrinth（429 限流时短暂退避重试一次） */
 async function mrFetch(p: string): Promise<unknown> {
@@ -371,7 +372,14 @@ async function providerSearch(source: CommunitySource, q: CommunityQuery): Promi
     const key = JSON.stringify({ ...q, source, offset: 0, limit: 0, mcmod: true })
     let catalog = aliasCatalogs.get(key)
     if (!catalog || Date.now() - catalog.time >= 60_000) {
-      const encyclopedia = await lookupMcmod(q.keyword)
+      let encyclopedia: Awaited<ReturnType<typeof lookupMcmod>>
+      try {
+        encyclopedia = await lookupMcmod(q.keyword)
+      } catch (error) {
+        // MC百科 查询失败不阻断搜索：直接按原词走来源站，仅提示百科不可用
+        const page = builtin ?? await builtinProviderSearch(source, q)
+        return { ...page, warnings: [...(page.warnings ?? []), `MC百科查询失败，已直接按原词搜索：${error instanceof Error ? error.message : String(error)}`] }
+      }
       if (!encyclopedia.entries.length) {
         const page = builtin ?? await builtinProviderSearch(source, q)
         return { ...page, warnings: [...(page.warnings ?? []), ...encyclopedia.warnings] }
