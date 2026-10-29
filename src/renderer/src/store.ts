@@ -136,8 +136,10 @@ export const mpInstall = reactive({
   bytesTotal: undefined as number | undefined
 })
 
-/** 社区整合包库预设（游戏版本页「整合包库」入口写入，CommunityView 挂载时消费后清空） */
-export const communityPackPreset = reactive<{ kind: 'modpack'; sort: 'downloads' } | null>(null)
+/** 社区整合包库预设（游戏版本页「整合包库」入口写入，CommunityView 挂载时消费后清空）。
+ *  注意：reactive(null) 返回的仍是 null，任何 .kind 读写都会抛 TypeError，
+ *  必须用可空对象而非可空引用。 */
+export const communityPackPreset = reactive<{ kind: 'modpack' | null; sort: 'downloads' | null }>({ kind: null, sort: null })
 
 const normalizeFolder = (value = '') => value.replaceAll('\\', '/').replace(/\/$/, '').toLowerCase()
 export const activeInstalled = computed(() => store.installed.filter(v => !v.folder || normalizeFolder(v.folder) === normalizeFolder(store.settings?.activeFolder || store.settings?.gameDir)))
