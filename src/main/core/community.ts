@@ -53,18 +53,24 @@ async function fetchJson(url: string, headers: Record<string, string> = {}, time
 
 // ---------------- Modrinth ----------------
 
-const MR_BASES = ['https://api.modrinth.com/v2', 'https://mod.mcimirror.top/modrinth/v2']
-/** 官方源在国内经常被墙/超时：首源给短超时快速失败，立即落到国内镜像；镜像给足 30s */
-const MR_FAST_TIMEOUT = 8000
+// 国内网络下官方源常被墙/极慢：镜像优先（国内公益镜像，响应更快更稳），官方源兜底。
+// 镜像 12s 超时、官方 8s 超时，全部失败才抛错。
+const MR_BASES = ['https://mod.mcimirror.top/modrinth/v2', 'https://api.modrinth.com/v2']
+const MR_TIMEOUTS = [12000, 8000]
 
-/** 主备互备请求 Modrinth */
+/** 主备互备请求 Modrinth（429 限流时短暂退避重试一次） */
 async function mrFetch(p: string): Promise<unknown> {
   let lastErr: unknown = null
-  for (let i = 0; i < MR_BASES.length; i++) {
-    try {
-      return await fetchJson(MR_BASES[i] + p, {}, i === 0 ? MR_FAST_TIMEOUT : undefined)
-    } catch (e) {
-      lastErr = e
+  for (let attempt = 0; attempt < 2; attempt++) {
+    for (let i = 0; i < MR_BASES.length; i++) {
+      try {
+        const res = await fetchJson(MR_BASES[i] + p, {}, MR_TIMEOUTS[i])
+        return res
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        if (/HTTP 429/.test(msg)) { lastErr = e; await new Promise(r => setTimeout(r, 900)); break }
+        lastErr = e
+      }
     }
   }
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr))
