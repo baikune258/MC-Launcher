@@ -716,6 +716,17 @@ export interface ProgressEvent {
   taskTitle?: string
 }
 
+export interface CrashReportInfo {
+  /** crash-reports 下文件名，如 crash-2026-10-29_20.51.18-client.txt */
+  file: string
+  /** 崩溃描述，如 Ticking entity */
+  description: string
+  /** 嫌疑模组行，如 Tinker's Newlife (tinkersnewlife), Version: 1.0.1.23 */
+  suspectedMod: string
+  /** 崩溃时间 */
+  time?: string
+}
+
 export interface LaunchState {
   savedWindowSize?: { scope: 'global' | 'instance'; previous: GameResolution; resolution: GameResolution }
   launchId?: string
@@ -727,6 +738,8 @@ export interface LaunchState {
   intentionalRestart?: boolean
   intentionalStop?: boolean
   exitKind?: import('./gameExit').GameExitKind
+  /** 异常退出时自动解析的最新崩溃报告（crash-reports/*.txt），供弹窗直显原因 */
+  crashReport?: CrashReportInfo
 }
 
 // ---------------- IPC 通道（invoke: 前端 await 调用） ----------------

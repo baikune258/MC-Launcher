@@ -11,6 +11,7 @@ import { createCommandWorld } from './commandWorld'
 import { autoMemoryMB } from '../../shared/memory'
 import { requestGameWindowClose, focusGameWindow, spawnGameProcess, applyGameWindowTitle, setGameProcessPriority } from './gracefulClose'
 import { logScope } from './launcherLog'
+import { findLatestCrashReport } from './crashReport'
 
 const launchLog = logScope('launch')
 import { reuseExternalRuntimeLibraries } from './externalRuntime'
@@ -903,7 +904,7 @@ async function launchOwned(
       lastLaunch.endedAt = new Date().toISOString()
       clearRunningGame()
     }
-    onState({ status: 'exited', savedWindowSize, code: code ?? -1, exitKind, intentionalRestart: restartPending?.sessionToken === token, intentionalStop: gameSession.wasIntentionalStop(token), text: exitKind === 'shutdown-timeout' ? '游戏已关闭；退出清理超时，日志已保留' : `游戏已退出 (code=${code ?? '未知'})` })
+    onState({ status: 'exited', savedWindowSize, code: code ?? -1, exitKind, intentionalRestart: restartPending?.sessionToken === token, intentionalStop: gameSession.wasIntentionalStop(token), text: exitKind === 'shutdown-timeout' ? '游戏已关闭；退出清理超时，日志已保留' : `游戏已退出 (code=${code ?? '未知'})`, ...(exitKind === 'abnormal' ? { crashReport: findLatestCrashReport(sessionDirectory) ?? undefined } : {}) })
   })
   } finally {
     deadline.dispose()

@@ -1309,7 +1309,12 @@ onMounted(async () => {
         if (shouldReportGameCrash(s)) {
           launchFail.open = true
           launchFail.title = `游戏异常退出（代码 ${signedExitCode(s.code ?? null) ?? '未知'}）`
-          launchFail.text = '游戏进程崩溃或被异常终止。可导出错误日志（含 crash-report 与 latest.log）用于排查。'
+          if (s.crashReport) {
+            const mod = s.crashReport.suspectedMod
+            launchFail.text = `游戏崩溃了。\n\n崩溃原因：${s.crashReport.description || '未知'}\n嫌疑模组：${mod || '未知（可导出错误日志进一步排查）'}\n崩溃报告：${s.crashReport.file}`
+          } else {
+            launchFail.text = '游戏进程崩溃或被异常终止。可导出错误日志（含 crash-report 与 latest.log）用于排查。'
+          }
         } else {
           toast(s.exitKind === 'shutdown-timeout' ? s.text : '游戏已退出', 'info')
         }
