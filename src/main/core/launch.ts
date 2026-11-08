@@ -913,10 +913,13 @@ async function launchOwned(
   }
 }
 
-/** 游戏启动成功后启动器自动退出：只触发一次；后台仅保留游戏本体进程 */
+/** 游戏启动成功后启动器自动退出：只触发一次；后台仅保留游戏本体进程。
+ *  必须尊重用户的「启动游戏后关闭启动器」设置（closeAfterLaunch，默认关闭），
+ *  否则会出现“每次启动游戏启动器莫名其妙直接退出”。 */
 let launcherExitScheduled = false
 function scheduleLauncherExit(delayMs = 800): void {
   if (launcherExitScheduled) return
+  if (!getSettings().closeAfterLaunch) return
   launcherExitScheduled = true
   setTimeout(() => {
     launchLog.info('游戏已启动，启动器自动退出（后台只保留游戏进程）')

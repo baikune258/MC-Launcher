@@ -163,6 +163,25 @@ const packFileName = (filePath: string): string => path.basename(filePath).repla
 
 async function openPackZip(filePath: string, signal?: AbortSignal, nested = false, smallNested?: Buffer): Promise<PackZip & { dispose(): Promise<void> }> {
   if (!filePath || !fs.existsSync(filePath)) throw new Error('整合包文件不存在，请重新选择')
+  // 明确区分 RAR / 7z：它们不是 zip，旧逻辑会统一报“文件损坏”，用户无法判断该怎么办。
+  if (!smallNested) {
+    let magic: Buffer | null = null
+    try {
+      const handle = await fs.promises.open(filePath, 'r')
+      try {
+        const buf = Buffer.alloc(8)
+        const { buffer } = await handle.read(buf, 0, 8, 0)
+        magic = buffer.subarray(0, 8)
+      } finally { await handle.close() }
+    } catch { magic = null }
+    if (magic) {
+      const is7z = magic[0] === 0x37 && magic[1] === 0x7a && magic[2] === 0xbc && magic[3] === 0xaf && magic[4] === 0x27 && magic[5] === 0x1c
+      const isRar = magic.subarray(0, 4).toString('latin1') === 'Rar!' && magic[4] === 0x1a && magic[5] === 0x07
+      if (is7z || isRar) {
+        throw new Error(`该整合包是 ${is7z ? '7z' : 'RAR'} 压缩格式，暂不支持直接导入；请用压缩软件解压后重新压成 .zip（或选择作者提供的 .zip / .mrpack 包）`)
+      }
+    }
+  }
   let zip: (PackZip & { close?(): void | Promise<void> }) | undefined, temporary = ''
   try {
     // Keep the proven fast small-archive path within a fixed 8 MiB ceiling.
@@ -730,6 +749,12 @@ interface ArchiveDetected {
 /**
  * 无清单整合包探测：zip 内含 mods/*.jar 或 config 等游戏根内容。
  * 只有材质包 / 光影 / 存档目录时不判定，避免吞掉普通资源压缩包与世界存档。
+ *
+ * 兼容三类常见打包方式：
+ * 1) 直接压缩游戏根：mods/、config/ 在 zip 根部；
+ * 2) .minecraft 目录打包：<xxx>/.minecraft/mods/...；
+ * 3) 外面再套一层任意命名的整合包文件夹：<包名>/mods/...、<包名>/minecraft/mods/...
+ *    （国内整合包最常见，旧逻辑只认 zip 根或 .minecraft，导致这类包被判“无法识别”）
  */
 function detectArchivePack(zip: PackZip): ArchiveDetected | null {
   const buckets = new Map<string, string[]>()
@@ -738,36 +763,44 @@ function detectArchivePack(zip: PackZip): ArchiveDetected | null {
     const name = normEntry(entry.entryName)
     if (!name) continue
     const lower = name.toLowerCase()
-    const mi = lower.indexOf('.minecraft/')
-    let rel: string
     let prefix: string
+    const mi = lower.indexOf('.minecraft/')
     if (mi >= 0) {
-      rel = name.slice(mi + '.minecraft/'.length)
       prefix = name.slice(0, mi + '.minecraft/'.length)
     } else {
-      const first = lower.split('/')[0] ?? ''
-      if (!GAME_ROOT_HINTS.has(first)) continue
-      rel = name
-      prefix = ''
+      const segs = lower.split('/')
+      let at = -1
+      for (let i = 0; i < segs.length - 1; i++) {
+        if (segs[i] === 'mods' || segs[i] === 'config') { at = i; break }
+      }
+      if (at < 0) continue
+      prefix = at === 0 ? '' : segs.slice(0, at).join('/') + '/'
     }
+    if (!name.startsWith(prefix)) continue
+    const rel = name.slice(prefix.length)
     if (!rel) continue
     const list = buckets.get(prefix)
     if (list) list.push(rel)
     else buckets.set(prefix, [rel])
   }
-  let best: { prefix: string; rels: string[] } | null = null
+  let best: { prefix: string; rels: string[]; jarCount: number; configCount: number } | null = null
   for (const [prefix, rels] of buckets) {
-    if (!best || rels.length > best.rels.length) best = { prefix, rels }
+    let jarCount = 0
+    let configCount = 0
+    for (const rel of rels) {
+      if (/^mods\//i.test(rel) && /\.jar$/i.test(rel)) jarCount++
+      else if (/^config\//i.test(rel)) configCount++
+    }
+    if (!jarCount && !configCount) continue
+    // mods 里的 jar 最能说明这是整合包；同分时取更浅的层级，避免把子目录当成游戏根
+    const score = jarCount * 4 + configCount
+    const bestScore = best ? best.jarCount * 4 + best.configCount : -1
+    if (!best || score > bestScore || (score === bestScore && prefix.length < best.prefix.length)) {
+      best = { prefix, rels, jarCount, configCount }
+    }
   }
   if (!best) return null
-  let jarCount = 0
-  let configCount = 0
-  for (const rel of best.rels) {
-    if (/^mods\//i.test(rel) && /\.jar$/i.test(rel)) jarCount++
-    else if (/^config\//i.test(rel)) configCount++
-  }
-  if (!jarCount && !configCount) return null
-  return { prefix: best.prefix, jarCount }
+  return { prefix: best.prefix, jarCount: best.jarCount }
 }
 
 /** 无清单包导入时永不覆盖的本地内容（存档、设置与日志属于玩家自己的数据） */

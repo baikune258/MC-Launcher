@@ -19,5 +19,5 @@ export async function probeImport(inputPath: string): Promise<ImportProbeResult>
   const world = await probeWorld(inputPath)
   if (world) return { kind: 'world', info: world }
   if (stat.isDirectory()) return { kind: 'mod' }
-  return { kind: 'unsupported', message: '无法识别导入内容：支持整合包（.mrpack／.zip）、存档 ZIP／文件夹和模组 JAR' }
+  return { kind: 'unsupported', message: '无法识别导入内容：整合包请提供 .mrpack／.zip（7z、RAR 请先解压后重新压成 zip），也支持存档 ZIP／文件夹和模组 JAR' }
 }

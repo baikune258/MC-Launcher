@@ -556,14 +556,18 @@ export function cancelMsLogin(): void {
 /** 用 refresh_token 重走整个 XBL→XSTS→MC 链，更新存储 */
 export async function refreshMicrosoft(account: Account): Promise<Account> {
   if (!account.refreshToken) throw new Error('缺少 refresh_token，请重新登录')
-  const t = await postForm(`${msAuthBase(getSettings().msClientId)}/token`, {
-    client_id: getSettings().msClientId,
+  // 必须与登录时使用同一个 client_id：设置为空时回退内置默认应用，
+  // 否则会向微软发送空 client_id，令牌刷新必然被拒（表现为隔天就要重新登录）。
+  const clientId = getSettings().msClientId || DEFAULT_MS_CLIENT_ID
+  const t = await postForm(`${msAuthBase(clientId)}/token`, {
+    client_id: clientId,
     grant_type: 'refresh_token',
     refresh_token: account.refreshToken,
     scope: MS_SCOPE
   })
   if (typeof t.access_token !== 'string') {
-    throw new Error((t.error_description as string | undefined) ?? '微软令牌刷新失败，请重新登录')
+    const detail = (t.error_description as string | undefined) ?? ''
+    throw new Error(detail ? `微软令牌刷新失败：${detail}` : '微软令牌刷新失败，请重新登录')
   }
   const refreshed = await completeMsLogin(
     t.access_token,
