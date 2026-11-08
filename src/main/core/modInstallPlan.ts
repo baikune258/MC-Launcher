@@ -116,6 +116,18 @@ export async function prepareModInstall(target: InstalledVersion, input: { paths
     signal?.throwIfAborted()
     const rootKeys = new Set(roots.map(f => `${f.source}:${f.fileId}`))
     plan.downloads = graph.filter(f => !rootKeys.has(`${f.source}:${f.fileId}`))
+    // Repository metadata cannot see JAR-internal bundles: JEI declares
+    // mezz_config as a dependency while shipping it inside META-INF/jars.
+    // Drop downloads whose mod ID is already provided with a satisfying
+    // version by the MODs being installed, otherwise the graph pulls a
+    // duplicate that the commit stage has to reject.
+    const satisfiedIds = new Set([...installed, ...mods].flatMap(m => provided(m).map(p => p.id.toLowerCase().replace(/[-_]/g, ''))))
+    const unresolvedIds = new Set(missing.map(d => d.id.toLowerCase().replace(/[-_]/g, '')))
+    plan.downloads = plan.downloads.filter(f => {
+      if (plan.pinnedFiles.has(`${f.source}:${f.fileId}`)) return true
+      const id = (f.projectId ?? '').toLowerCase().replace(/[-_]/g, '')
+      return !id || !satisfiedIds.has(id) || unresolvedIds.has(id)
+    })
     // Local drops lack repository project IDs; resolve mod-id candidates separately.
     for (const req of [...new Map(missing.map(d => [d.id, d])).values()]) {
       signal?.throwIfAborted()
@@ -154,6 +166,7 @@ export async function executeModPlan(id: string, includeDependencies: boolean, r
   if (!plan || plan.expires < Date.now()) throw new Error('安装计划已过期，请重新解析')
   plans.delete(id) // A plan may only commit once, including concurrent invoke calls.
   const created: string[] = []
+  const renamed: Array<{ from: string; to: string }> = []
   try {
     const target = revalidate(plan.view.target)
     if (target.gameDirectory !== plan.view.target.gameDirectory) throw new Error('实例隔离目录已变更，请重新解析')
@@ -171,9 +184,12 @@ export async function executeModPlan(id: string, includeDependencies: boolean, r
       if (!modMatchesInstance(mod, target)) throw new Error(`${file.fileName} 的 JAR 元数据不兼容目标实例：${modMismatchReasons(mod, target).join('；')}`)
       const pinned = plan.pinnedFiles.get(`${file.source}:${file.fileId}`)
       if (pinned) pinnedPaths.set(mod.filePath, pinned)
-      // A pinned repository edge requires that exact file. An existing provider
-      // with the same mod ID may only satisfy an unpinned compatible dependency.
-      if (pinned || !installed.some(m => provided(m).some(p => p.id === mod.id))) staged.push(mod)
+      // A pinned repository edge requires that exact file. Everything else is
+      // only staged while its mod ID is still unsatisfied: JARs that bundle a
+      // nested library (e.g. JEI ships mezz_config) already provide it, and
+      // writing a second copy would create a duplicate-mod crash in game.
+      const stillMissing = missingRequirements(staged, target, [...installed, ...staged]).some(d => d.id === mod.id)
+      if (pinned || stillMissing) staged.push(mod)
     }
     const current = revalidate(plan.view.target)
     if (current.gameDirectory !== target.gameDirectory) throw new Error('下载期间实例目录发生变化，未安装任何 MOD')
@@ -195,30 +211,56 @@ export async function executeModPlan(id: string, includeDependencies: boolean, r
       if (!present) throw new Error(`未写入任何 MOD；必要前置 ${pinned.projectId || pinned.fileName} 要求精确版本 ${pinned.fileId}，已准备或已安装的文件已变化，请重新检测`)
     }
     const accepted: ModInfo[] = []
+    const replace: string[] = []
     for (const mod of staged) {
       const existing = [...installed, ...accepted].find(m => provided(m).some(p => p.id === mod.id))
       if (existing) {
         const [existingHash, stagedHash] = await Promise.all([hash(existing.filePath), hash(mod.filePath)])
         if (existingHash === stagedHash) continue
-        const pinned = pinnedPaths.get(mod.filePath)
-        if (pinned) throw new Error(`前置版本冲突：${mod.id} 要求精确版本 ${pinned.fileId}，已有 ${existing.version || '其他版本'}；未写入任何 MOD，请先处理旧文件后重新检测`)
-        throw new Error(`已存在 ${mod.id}，未覆盖或重复安装；请先处理旧文件`)
+        if (accepted.includes(existing)) {
+          // Another MOD in this same transaction already provides this ID (a
+          // bundled nested JAR). A pinned edge cannot be satisfied that way.
+          if (pinnedPaths.has(mod.filePath)) throw new Error(`前置版本冲突：${mod.id} 要求精确版本 ${pinnedPaths.get(mod.filePath)!.fileId}，本次安装的 ${existing.fileName} 已内置其他版本；未写入任何 MOD，请重新检测`)
+          continue
+        }
+        if (pinnedPaths.has(mod.filePath)) throw new Error(`前置版本冲突：${mod.id} 要求精确版本 ${pinnedPaths.get(mod.filePath)!.fileId}，已有 ${existing.version || '其他版本'}；未写入任何 MOD，请先处理旧文件后重新检测`)
+        // Replace an older copy already sitting in the instance. The old file
+        // is never deleted: it is renamed to *.disabled so it stops loading and
+        // can still be restored by the user.
+        replace.push(existing.filePath)
       }
       accepted.push(mod)
     }
     const dir = path.join(target.gameDirectory!, 'mods'); fs.mkdirSync(dir, { recursive: true })
+    const disable = (file: string) => {
+      if (!fs.existsSync(file)) return
+      const to = disabledBackupPath(file)
+      fs.renameSync(file, to)
+      renamed.push({ from: file, to })
+    }
+    for (const file of new Set(replace)) disable(file)
     emit({ stage: 'mod-commit', progress: 0, overall: 0.95, indeterminate: true, text: `正在写入 ${accepted.length} 个 MOD…` })
     for (const mod of accepted) {
       signal?.throwIfAborted()
       const dest = path.join(dir, path.basename(mod.fileName))
+      if (fs.existsSync(dest)) disable(dest)
       fs.copyFileSync(mod.filePath, dest, fs.constants.COPYFILE_EXCL); created.push(dest)
     }
-    const message = `已安装 ${created.length} 个 MOD 到 ${dir}`
+    const message = `已安装 ${created.length} 个 MOD 到 ${dir}${renamed.length ? `（已替换 ${renamed.length} 个旧文件，旧版保留为 .disabled，可手动改回）` : ''}`
     emit({ stage: 'done', progress: 1, overall: 1, indeterminate: false, text: message })
     return message
   } catch (error) {
     // Only files created by this transaction, never existing user content.
     for (const file of created) fs.unlinkSync(file)
+    for (const { from, to } of renamed) { try { if (!fs.existsSync(from)) fs.renameSync(to, from) } catch { /* keep the backup rather than lose the user's file */ } }
     throw error
   } finally { clean(plan) }
+}
+
+/** Never delete an existing mod: park it beside itself as *.disabled. */
+function disabledBackupPath(file: string): string {
+  const base = file.replace(/\.jar$/i, '')
+  let candidate = `${base}.jar.disabled`
+  for (let i = 1; fs.existsSync(candidate); i++) candidate = `${base}-${i}.jar.disabled`
+  return candidate
 }
