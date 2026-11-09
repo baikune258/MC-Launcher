@@ -145,8 +145,15 @@ function uniqueInstanceId(name: string, reserved?: ReadonlySet<string>): string 
   return id
 }
 
+/** 条目名可能带反斜杠或 ./ 前缀；精确查不到时按归一化名回退匹配。 */
+function findEntry(zip: PackZip, name: string): PackEntry | null {
+  const exact = zip.getEntry(name) ?? zip.getEntry('./' + name)
+  if (exact) return exact
+  return zip.getEntries().find((entry) => normEntry(entry.entryName) === name) ?? null
+}
+
 async function readEntryJson(zip: PackZip, name: string): Promise<unknown> {
-  const entry = zip.getEntry(name) ?? zip.getEntry('./' + name)
+  const entry = findEntry(zip, name)
   if (!entry) return null
   // Some Windows exporters/editors write a UTF-8 BOM before otherwise valid
   // JSON. Ignore only that leading marker; keep every other parse check intact.
@@ -301,7 +308,7 @@ async function detectFullpackEntry(zip: PackZip): Promise<FullpackDetected | nul
 }
 
 type Detected =
-  | { format: 'mrpack' | 'curseforge' }
+  | { format: 'mrpack' | 'curseforge'; prefix?: string }
   | { format: 'mmc'; mmc: MmcDetected }
   | { format: 'fullpack'; full: FullpackDetected }
   | { format: 'archive'; archive: ArchiveDetected }
@@ -368,11 +375,35 @@ function detectMmcGamePrefix(zip: PackZip, prefix: string): string | null {
   return minecraftPrefix ?? (rootGame ? '' : null)
 }
 
+/**
+ * 有些整合包会被作者或压缩工具多包一层同名目录（`1.20.1整合包/modrinth.index.json`、
+ * `我的整合包/manifest.json`），还有把 .mrpack 解压后重新压包的情况。清单在唯一的一级
+ * 子目录里时按该前缀解析，避免明明是正确的包被判成“无法识别”。
+ */
+function detectWrappedManifest(names: Set<string>): { format: 'mrpack' | 'curseforge'; prefix: string } | null {
+  const candidates: { format: 'mrpack' | 'curseforge'; prefix: string }[] = []
+  for (const name of names) {
+    const m = /^([^/]+)\/(modrinth\.index\.json|manifest\.json)$/i.exec(name)
+    if (!m) continue
+    candidates.push({
+      prefix: `${m[1]}/`,
+      format: m[2].toLowerCase() === 'modrinth.index.json' ? 'mrpack' : 'curseforge'
+    })
+  }
+  const prefixes = new Set(candidates.map((c) => c.prefix))
+  if (prefixes.size === 0) return null
+  // 多个一级目录都带清单时无法判断该用哪一份，保持原判错，让用户解压后选择。
+  if (prefixes.size > 1) return null
+  return candidates.find((c) => c.format === 'mrpack') ?? candidates[0]
+}
+
 /** 五格式探测：mrpack → curseforge → multimc → fullpack → 无清单整合包，均不命中抛错 */
 async function detectPack(zip: PackZip): Promise<Detected> {
   const names = new Set(zip.getEntries().map((e) => normEntry(e.entryName)))
   if (names.has('modrinth.index.json')) return { format: 'mrpack' }
   if (names.has('manifest.json')) return { format: 'curseforge' }
+  const wrapped = detectWrappedManifest(names)
+  if (wrapped) return { format: wrapped.format, prefix: wrapped.prefix }
   const mmc = await detectMmcPack(zip)
   if (mmc) return { format: 'mmc', mmc }
   const full = await detectFullpackEntry(zip)
@@ -394,10 +425,10 @@ const MR_LOADERS: Array<[string, LoaderName]> = [
   ['forge', 'forge']
 ]
 
-async function parseMrpack(zip: PackZip): Promise<Parsed> {
+async function parseMrpack(zip: PackZip, prefix = ''): Promise<Parsed> {
   let idx: MrpackIndex | null = null
   try {
-    idx = await readEntryJson(zip, 'modrinth.index.json') as MrpackIndex | null
+    idx = await readEntryJson(zip, `${prefix}modrinth.index.json`) as MrpackIndex | null
   } catch {
     throw new Error('modrinth.index.json 已损坏，整合包无法解析')
   }
@@ -468,8 +499,8 @@ async function parseMrpack(zip: PackZip): Promise<Parsed> {
       mcVersion,
       loader,
       loaderVersion,
-      overridesPrefix: 'overrides',
-      clientOverridesPrefix: 'client-overrides'
+      overridesPrefix: `${prefix}overrides`,
+      clientOverridesPrefix: `${prefix}client-overrides`
     },
     files
   }
@@ -479,10 +510,10 @@ async function parseMrpack(zip: PackZip): Promise<Parsed> {
 
 const CF_LOADER_IDS = new Set(['fabric', 'forge', 'quilt', 'neoforge'])
 
-async function parseCurseForge(zip: PackZip): Promise<Parsed> {
+async function parseCurseForge(zip: PackZip, prefix = ''): Promise<Parsed> {
   let mf: CfManifest | null = null
   try {
-    mf = await readEntryJson(zip, 'manifest.json') as CfManifest | null
+    mf = await readEntryJson(zip, `${prefix}manifest.json`) as CfManifest | null
   } catch {
     throw new Error('manifest.json 已损坏，整合包无法解析')
   }
@@ -512,7 +543,7 @@ async function parseCurseForge(zip: PackZip): Promise<Parsed> {
       mcVersion,
       loader,
       loaderVersion,
-      overridesPrefix: mf?.overrides ?? 'overrides'
+      overridesPrefix: `${prefix}${mf?.overrides ?? 'overrides'}`
     },
     files: (mf?.files ?? [])
       .filter((f) => !!f?.projectID && !!f?.fileID)
@@ -1231,7 +1262,7 @@ export async function probeRecognizedModpack(filePath: string): Promise<ModpackI
   const zip = await openPackZip(filePath)
   try {
   const names = new Set(zip.getEntries().map(entry => normEntry(entry.entryName)))
-  if (names.has('modrinth.index.json') || names.has('manifest.json') || await detectMmcPack(zip) || await detectFullpackEntry(zip)) {
+  if (names.has('modrinth.index.json') || names.has('manifest.json') || detectWrappedManifest(names) || await detectMmcPack(zip) || await detectFullpackEntry(zip)) {
     return await modpackInfo(zip, filePath)
   }
   // 无清单整合包：作者直接把游戏目录压成 zip，导入时补充进用户指定的实例。
@@ -1295,7 +1326,9 @@ async function modpackInfo(zip: PackZip, filePath: string): Promise<ModpackInfo>
       existingInstances: []
     }
   }
-  const parsed = await (detected.format === 'mrpack' ? parseMrpack(zip) : parseCurseForge(zip))
+  const parsed = await (detected.format === 'mrpack'
+    ? parseMrpack(zip, detected.prefix ?? '')
+    : parseCurseForge(zip, detected.prefix ?? ''))
   const { meta } = parsed
   const files = parsed.files
   return {
@@ -1445,8 +1478,8 @@ async function installModpackInFolder(filePath: string, emit: ProgressEmit, opts
   // 2) 解析清单
   report({ stage: 'modpack', progress: 0, text: '解析整合包信息…' })
   let parsed: Parsed
-  if (detected.format === 'mrpack') parsed = await parseMrpack(zip)
-  else if (detected.format === 'curseforge') parsed = await parseCurseForge(zip)
+  if (detected.format === 'mrpack') parsed = await parseMrpack(zip, detected.prefix ?? '')
+  else if (detected.format === 'curseforge') parsed = await parseCurseForge(zip, detected.prefix ?? '')
   else if (detected.format === 'mmc') parsed = await parseMmcPack(zip, detected.mmc)
   else throw new Error('不支持的整合包格式')
   throwIfCancelled(opts?.signal)
