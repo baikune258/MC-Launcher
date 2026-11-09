@@ -44,8 +44,11 @@ export class StreamPackZip implements PackZip {
     const descriptor = await new Promise<number>((resolve, reject) => fs.open(file, 'r', (error, fd) => error ? reject(error) : resolve(fd)))
     let zip: ZipFile
     try {
+      // validateEntrySizes 会在扫描阶段因“存储条目声明大小与实际不符”直接拒绝整个包。
+      // 国内不少整合包（如 CustomSkinLoader 空缓存文件）就会出现 compressed=2/uncompressed=0 这种
+      // 良性偏差；改为在读取阶段按条目声明大小与 CRC 自行校验，见 read()。
       zip = await new Promise<ZipFile>((resolve, reject) => yauzl.fromFd(descriptor,
-        { lazyEntries: true, autoClose: false, decodeStrings: true, validateEntrySizes: true },
+        { lazyEntries: true, autoClose: false, decodeStrings: true, validateEntrySizes: false },
         (error, zip) => error ? reject(error) : resolve(zip!)))
     } catch (error) { fs.closeSync(descriptor); throw error }
     // Yauzl owns this descriptor until close; positioned payload streams borrow
@@ -121,12 +124,17 @@ export class StreamPackZip implements PackZip {
     try {
     const { fileDataStart } = await this.zip.readLocalFileHeaderPromise(entry, { minimal: true })
     if (this.closed) throw new Error('整合包已关闭')
-    const compressed = entry.compressedSize ? fs.createReadStream(this.file, {
+    // 存储型条目若声明大小不一致，以较小的声明值为准读取（多余字节是打包工具写入的填充，
+    // 不属于文件内容）；随后的大小与 CRC 校验仍按 uncompressedSize 严格执行。
+    const length = entry.compressionMethod === 0
+      ? Math.min(entry.compressedSize, entry.uncompressedSize)
+      : entry.compressedSize
+    const compressed = length ? fs.createReadStream(this.file, {
       fd: this.descriptor, autoClose: false,
       // Explicit destroy closes a ReadStream's FD even with autoClose:false.
       // Its close hook only releases the borrowed reader; yauzl owns the FD.
       fs: { read: fs.read, close: (_descriptor, callback) => callback(null) },
-      start: fileDataStart, end: fileDataStart + entry.compressedSize - 1, highWaterMark: 1024 * 1024
+      start: fileDataStart, end: fileDataStart + length - 1, highWaterMark: 1024 * 1024
     }) : Readable.from([])
     const inflater = entry.compressionMethod === 8 ? createInflateRaw({ chunkSize: 1024 * 1024 }) : null
     const source = inflater ? compressed.pipe(inflater) : compressed
