@@ -201,19 +201,19 @@ async function pickJavaForInstaller(mcVersion: string, emit: ProgressEmit, signa
   return await ensureJava(vj, emit, mcVersion, { signal })
 }
 
-/** 运行 forge/neoforge 安装器：全量输出落盘 installer.log；失败带最后 30 行；--mirror= 等号形式，失败降级去 mirror 重试；signal 取消时杀掉安装器进程 */
-function runInstaller(javaPath: string, jar: string, emit: ProgressEmit, signal?: AbortSignal, target = gameDir()): Promise<void> {
+/** 运行 forge/neoforge 安装器：全量输出落盘 installer.log；失败带最后 30 行；--mirror= 等号形式，失败降级去 mirror 重试；signal 取消时杀掉安装器进程。返回安装器完整输出，供失败诊断。 */
+function runInstaller(javaPath: string, jar: string, emit: ProgressEmit, signal?: AbortSignal, target = gameDir(), mode: 'auto' | 'official' = 'auto'): Promise<string> {
   // External Java installers rewrite launcher_profiles.json in their target folder.
   // Only this final installer phase is serialized; version/file downloads remain concurrent.
   emit({ stage: 'loader-process', progress: 0, indeterminate: true, text: '等待同一游戏目录的安装器任务完成…' })
   return withFileJob(path.join(target, '.kamucl-installer'), signal, () => {
     emit({ stage: 'loader-process', progress: 0, indeterminate: true, text: '正在启动加载器安装器…' })
-    return runInstallerUnlocked(javaPath, jar, emit, signal, target)
+    return runInstallerUnlocked(javaPath, jar, emit, signal, target, mode)
   })
 }
 
-function runInstallerUnlocked(javaPath: string, jar: string, emit: ProgressEmit, signal: AbortSignal | undefined, target: string): Promise<void> {
-  const useMirror = getSettings().mirror === 'bmclapi'
+function runInstallerUnlocked(javaPath: string, jar: string, emit: ProgressEmit, signal: AbortSignal | undefined, target: string, mode: 'auto' | 'official' = 'auto'): Promise<string> {
+  const useMirror = mode === 'auto' && getSettings().mirror === 'bmclapi'
 
   const buildArgs = (withMirror: boolean): string[] => {
     const args = ['-jar', jar, '--installClient', target]
@@ -221,7 +221,7 @@ function runInstallerUnlocked(javaPath: string, jar: string, emit: ProgressEmit,
     return args
   }
 
-  const runOnce = (args: string[]): Promise<void> =>
+  const runOnce = (args: string[]): Promise<string> =>
     new Promise((resolve, reject) => {
       loaderLog.info(`运行 ${path.basename(jar)} 安装器（目标目录 ${target}）`)
       const proc = spawn(javaPath, args, { windowsHide: true, cwd: target })
@@ -277,7 +277,7 @@ function runInstallerUnlocked(javaPath: string, jar: string, emit: ProgressEmit,
           loaderLog.error(`安装器进程异常：${String(spawnError)}`)
           reject(spawnError)
         }
-        else if (code === 0) resolve()
+        else if (code === 0) resolve(allLines.join('\n'))
         else {
           const last = allLines.slice(-30).join('\n')
           loaderLog.error(`安装器失败（退出码 ${code ?? '未知'}），末尾输出：${last.slice(-400)}`)
@@ -333,6 +333,21 @@ export async function repairNeoRuntime(json: VersionJson, clientJar: string, bas
 }
 
 /** 安装完成后扫描 versions/ 找安装器生成的版本目录名 */
+/** 安装器以 0 退出却没有生成版本目录：把真实原因（证书/网络）翻译成可执行提示，并附末尾输出。 */
+function loaderInstallerFailure(output: string): string {
+  const lines = output
+    .split(/\r?\n/)
+    .filter((line) => line.trim() && !/^Picked up JAVA_TOOL_OPTIONS/.test(line))
+  const tail = lines.slice(-10).join('\n')
+  if (/PKIX|certificate_unknown|certpath|Failed to validate certificates/i.test(output)) {
+    return `加载器安装器无法校验 HTTPS 证书，未能生成版本文件（常见原因：系统时间不正确、代理/加速器或安全软件拦截了 HTTPS）。请关闭代理或加速器、校准系统时间后重试。\n安装器末尾输出：\n${tail}`
+  }
+  if (/UnknownHost|Connection (?:refused|reset|timed out)|\b(?:403|502|503)\b/i.test(output)) {
+    return `加载器安装器下载失败，未能生成版本文件。请检查网络，或在设置中切换镜像源（BMCLAPI）后重试。\n安装器末尾输出：\n${tail}`
+  }
+  return `加载器安装器运行结束，但未生成版本文件。\n安装器末尾输出：\n${tail || '（安装器没有输出）'}`
+}
+
 function findInstalledDir(loader: LoaderName, mcVersion: string, loaderVersion: string): string | null {
   const dir = versionsDir()
   if (!fs.existsSync(dir)) return null
@@ -455,6 +470,7 @@ async function installLoaderInternal(
   const jarPath = path.join(os.tmpdir(), `kamucl-${loader}-installer-${Date.now()}.jar`)
   let legacyInstaller: PreparedLegacyForgeInstaller | undefined
   let legacyInstalledId: string | undefined
+  let installerOutput = ''
   try {
     // A user-owned matching loader instance must not be renamed into a new pack.
     const reusable = instanceName?.trim() ? findInstalledDir(loader, mcVersion, loaderVersion) : null
@@ -500,7 +516,13 @@ async function installLoaderInternal(
               }
               signal?.throwIfAborted()
               processorEmit({ stage: 'loader-process', progress: 0, indeterminate: true, text: '生成加载器运行文件…' })
-              await runInstaller(javaPath, jarPath, processorEmit, signal)
+              installerOutput = await runInstaller(javaPath, jarPath, processorEmit, signal)
+              // 安装器可能在下载/校验失败后仍以 0 退出（例如证书或网络被拦截），此时不会生成版本目录。
+              // 先换源重试一次，仍失败则把安装器真实报错抛给界面，而不是只报“找不到版本目录”。
+              if (!findInstalledDir(loader, mcVersion, loaderVersion) && getSettings().mirror === 'bmclapi') {
+                processorEmit({ stage: 'loader-process', progress: 0, indeterminate: true, text: '镜像模式未生成加载器文件，改用官方源重试…' })
+                installerOutput = await runInstaller(javaPath, jarPath, processorEmit, signal, gameDir(), 'official')
+              }
             }
             processorEmit({ stage: 'loader-process', progress: 1, text: '加载器运行文件已生成' })
 
@@ -536,7 +558,7 @@ async function installLoaderInternal(
 
 
       const id0 = legacyInstalledId ?? findInstalledDir(loader, mcVersion, loaderVersion)
-      if (!id0) throw new Error('安装器运行结束，但未找到生成的版本目录')
+      if (!id0) throw new Error(loaderInstallerFailure(installerOutput))
       // 自定义实例名：重命名安装器生成的目录与 json id
       id = id0
       if (instanceName?.trim() && instanceName.trim() !== id0) {
