@@ -211,7 +211,7 @@ export async function getVersionJson(
       manifest = await fetchVersionManifest(mirror, true, signal)
       entry = manifest.find((v) => v.id === versionId)
     }
-    if (!entry) throw new Error(`版本清单中找不到 ${versionId}`)
+    if (!entry) throw new Error(`版本清单中找不到 ${versionId}（本地没有该版本的描述文件，官方清单也没有这个条目。若是整合包实例，请重新导入整合包；若是原版/加载器版本，请在版本列表重新下载）`)
     fs.mkdirSync(path.dirname(jsonPath), { recursive: true })
     await downloadFile(entry.url, jsonPath, undefined, undefined, mirror, signal)
   }

@@ -40,15 +40,26 @@ export function mirrorUrl(input: string, mirror: MirrorPref): string {
 export function downloadCandidates(urls: string[], mirror: MirrorPref): string[] {
   return [...new Set(urls.flatMap(url => {
     const variants = [url]
+    let cdnMirror: string | null = null
     try {
       const u = new URL(url)
-      if (u.protocol === 'https:' && ['edge.forgecdn.net', 'mediafilez.forgecdn.net'].includes(u.hostname) && /^\/files\/\d+\/\d+\//.test(u.pathname)) {
+      const isForgeCdn = u.protocol === 'https:' && ['edge.forgecdn.net', 'mediafilez.forgecdn.net'].includes(u.hostname) && /^\/files\/\d+\/\d+\//.test(u.pathname)
+      const isModrinthCdn = u.protocol === 'https:' && u.hostname === 'cdn.modrinth.com' && /^\/data\/[^/]+\/versions\//.test(u.pathname)
+      if (isForgeCdn) {
         // Same immutable CDN object, independent of the edge redirect cache.
         u.hostname = 'mediafilez.forgecdn.net'; variants.unshift(u.href)
         u.hostname = 'edge.forgecdn.net'; variants.push(u.href)
       }
+      if (isForgeCdn || isModrinthCdn) {
+        const mirrored = mirrorUrl(url, 'bmclapi')
+        if (mirrored !== url) cdnMirror = mirrored
+      }
     } catch { /* Keep URL validation in the transfer. */ }
-    return [...(mirror === 'official' ? [] : [mirrorUrl(url, mirror)]), ...variants]
+    // 某些地区的 edge 节点会对单个对象返回 404，而社区镜像仍能命中同一对象；
+    // 官方源模式下把它放在最后作为兜底，不改变原有的优先级。
+    const ordered = [...(mirror === 'official' ? [] : [mirrorUrl(url, mirror)]), ...variants]
+    if (mirror === 'official' && cdnMirror && !ordered.includes(cdnMirror)) ordered.push(cdnMirror)
+    return ordered
   }))]
 }
 export type HttpFailureKind = 'unavailable' | 'transient' | 'fatal'
@@ -459,15 +470,44 @@ async function segmented(url: string, dest: string, expected: Integrity, signal:
     if (error instanceof InvalidContent || (error instanceof DownloadHttpError && [403,404,416].includes(error.status))) {
       // Never throw away good fragments just because one CDN rejects Range. A plain
       // response is a final compatibility path, and is still verified before commit.
+      // Every candidate gets this path: a single edge node can answer 404 for an object
+      // the other hosts still serve.
       await fs.promises.rm(dest + '.part', { force: true })
-      const bytes = await receive(url, dest + '.part', expected, signal, progress, fallback, undefined, undefined, sourcePool, url, waitControl)
-      const invalid = await verifyFile(dest + '.part', expected, signal)
-      if (invalid) throw new InvalidContent(invalid)
-      await clear()
-      return bytes
+      let lastFallback: unknown = error
+      for (const candidate of [...new Set([url, ...alternatives])]) {
+        signal?.throwIfAborted()
+        try {
+          const bytes = await receive(candidate, dest + '.part', expected, signal, progress, fallback, undefined, undefined, sourcePool, candidate, waitControl)
+          const invalid = await verifyFile(dest + '.part', expected, signal)
+          if (invalid) { await fs.promises.rm(dest + '.part', { force: true }); throw new InvalidContent(invalid) }
+          await clear()
+          return bytes
+        } catch (fallbackError) {
+          signal?.throwIfAborted()
+          lastFallback = fallbackError
+          await fs.promises.rm(dest + '.part', { force: true })
+        }
+      }
+      throw lastFallback
     }
     throw error
   } finally { clearInterval(poll); signal?.removeEventListener('abort', cancel); controller.abort() }
+}
+
+
+/** CurseForge 的 edge 节点偶尔对单个对象返回 404；同一份文件可能也存在于 Modrinth。 */
+async function modrinthUrlBySha1(sha1: string, signal?: AbortSignal): Promise<string | null> {
+  if (!/^[a-f0-9]{40}$/i.test(sha1)) return null
+  try {
+    const timeout = AbortSignal.timeout(6000)
+    const res = await downloadFetch(`https://api.modrinth.com/v2/version_file/${sha1.toLowerCase()}`, {
+      signal: signal ? AbortSignal.any([signal, timeout]) : timeout
+    })
+    if (!res.ok) { await res.body?.cancel(); return null }
+    const data = await res.json() as { files?: { url?: string; hashes?: { sha1?: string } }[] }
+    const hit = data.files?.find(file => file.url && (file.hashes?.sha1 ?? '').toLowerCase() === sha1.toLowerCase())
+    return hit?.url ?? null
+  } catch { signal?.throwIfAborted(); return null }
 }
 
 export async function downloadFile(url: string, dest: string, progress?: ProgressFn, sha1?: string, mirror: MirrorPref = 'official', signal?: AbortSignal, alternatives: string[] = [], integrity: { sha512?: string; sha256?: string; size?: number; reuseDirs?: string[]; reuseFiles?: string[]; systemProxy?: boolean; maxAttempts?: number; maxSegments?: number | (() => number); sourcePool?: DownloadSourcePool; onWait?: (state: DownloadWaitState, active: boolean) => void } = {}): Promise<void> {
@@ -513,10 +553,30 @@ export async function downloadFile(url: string, dest: string, progress?: Progres
           }
         }
       }
+      // 所有已知 CDN 都不可用时，按 SHA1 到 Modrinth 反查同一文件再试一次；
+      // 命中后仍走完整的大小/SHA1 校验，失败不影响原有错误。
+      if (sha1) {
+        const alt = await modrinthUrlBySha1(sha1, signal)
+        if (alt) {
+          signal?.throwIfAborted()
+          try {
+            const bytes = await receive(alt, temporary, expected, signal, progress, false, undefined, undefined, integrity.sourcePool, alt)
+            const invalid = await verifyFile(temporary, expected, signal)
+            if (!invalid) {
+              signal?.throwIfAborted()
+              await fs.promises.rename(temporary, dest)
+              progress?.(bytes, bytes)
+              return
+            }
+          } catch { signal?.throwIfAborted() }
+          await fs.promises.rm(temporary, { force: true })
+        }
+      }
       const failure = lastError as Error & { downloadUrl?: string; cause?: { code?: string; message?: string } }
       let address = failure.downloadUrl || url
       try { const u = new URL(address); address = u.origin + u.pathname } catch { /* retain invalid input */ }
-      throw new Error(`下载失败：${failure.message || String(lastError)}${failure.cause?.code ? ` (${failure.cause.code})` : ''}\n文件：${path.basename(dest)}\n地址：${address}`, { cause: lastError })
+      const tried = [...new Set(candidates.map(candidate => { try { const u = new URL(candidate); return u.origin + u.pathname } catch { return candidate } }))]
+      throw new Error(`下载失败：${failure.message || String(lastError)}${failure.cause?.code ? ` (${failure.cause.code})` : ''}\n文件：${path.basename(dest)}\n地址：${address}${tried.length > 1 ? `\n已尝试 ${tried.length} 个地址：${tried.slice(0, 3).join('、')}` : ''}`, { cause: lastError })
     } finally {
       // No detached stream may keep writing after this promise settles.
       await fs.promises.rm(temporary, { force: true })
