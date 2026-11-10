@@ -7,6 +7,8 @@ const v = (id: string, type: RemoteVersion['type'], releaseTime: string): Remote
 
 test('4 月 1 日的快照判为愚人节版本，当天发布的正式版不算', () => {
   assert.equal(isAprilFools(v('24w14potato', 'snapshot', '2024-04-01T00:00:00+00:00')), true)
+  assert.equal(isAprilFools(v('1.RV-Pre1', 'snapshot', '2016-03-31T16:18:53+00:00')), true)
+  assert.equal(isAprilFools(v('26.1.1-rc-1', 'snapshot', '2026-03-31T10:07:21+00:00')), false)
   assert.equal(isAprilFools(v('26.1.1', 'release', '2026-04-01T00:00:00+00:00')), false)
   assert.equal(isAprilFools(v('1.20.1', 'release', '2023-06-12T00:00:00+00:00')), false)
 })
