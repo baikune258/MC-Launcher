@@ -28,15 +28,24 @@ export async function zuluPackage(target: JavaTarget, read: ReadJson): Promise<J
   const system = os === 'mac' ? 'macos' : os, cpu = arch === 'aarch64' ? 'arm' : 'x86', archive = os === 'windows' ? 'zip' : 'tar.gz'
   const query = new URLSearchParams({ java_version: String(major), os: system, arch: cpu, hw_bitness: '64', archive_type: archive, java_package_type: 'jre', javafx_bundled: 'false', release_status: 'ga', availability_types: 'CA', latest: 'true' })
   const list = await read(`https://api.azul.com/metadata/v1/zulu/packages/?${query}`)
-  const item = Array.isArray(list) && list.find(a => a.java_version?.[0] === major && a.availability_type === 'CA' && /^[\da-f-]{36}$/i.test(a.package_uuid))
-  if (!item) throw new Error(`Azul 没有匹配 Java ${major} ${system}/${cpu} 的 JRE`)
-  const detail = await read(`https://api.azul.com/metadata/v1/zulu/packages/${item.package_uuid}`)
-  if (detail.java_version?.[0] !== major || detail.os !== system || detail.arch !== cpu || detail.hw_bitness !== 64 || detail.java_package_type !== 'jre' || detail.archive_type !== archive || detail.availability_type !== 'CA') throw new Error('Azul 返回的 Java 版本或平台不匹配')
-  const pkg = verifiedPackage('Azul Zulu', detail.download_url, detail.sha256_hash, detail.size, ['cdn.azul.com'])
-  // Azul's API size can be rounded (25/mac-arm64 reports 56,496,600 for a
-  // 56,496,636-byte archive with the correct SHA256). Get exact size from the
-  // binary response instead; never treat this hint as an integrity constraint.
-  return { ...pkg, size: undefined }
+  // The Azul listing ignores hw_bitness in practice and can return 32-bit
+  // (win_i686) builds first, so every candidate is re-checked against its own
+  // detail record instead of trusting the first entry.
+  const candidates = Array.isArray(list)
+    ? list.filter(a => a.java_version?.[0] === major && a.availability_type === 'CA' && /^[\da-f-]{36}$/i.test(a.package_uuid))
+    : []
+  if (!candidates.length) throw new Error(`Azul 没有匹配 Java ${major} ${system}/${cpu} 的 JRE`)
+  const mismatched: string[] = []
+  for (const item of candidates.sort((a, b) => Number(String(b.download_url ?? '').includes('x64')) - Number(String(a.download_url ?? '').includes('x64')))) {
+    const detail = await read(`https://api.azul.com/metadata/v1/zulu/packages/${item.package_uuid}`)
+    if (detail.java_version?.[0] !== major || detail.os !== system || detail.arch !== cpu || detail.hw_bitness !== 64 ||
+        detail.java_package_type !== 'jre' || detail.archive_type !== archive || detail.availability_type !== 'CA') {
+      mismatched.push(`${String(detail.arch)}/${String(detail.hw_bitness)}`)
+      continue
+    }
+    return { ...verifiedPackage('Azul Zulu', detail.download_url, detail.sha256_hash, detail.size, ['cdn.azul.com']), size: undefined }
+  }
+  throw new Error(`Azul 返回的 Java 版本或平台不匹配（仅有 ${mismatched.slice(0, 3).join('、') || '不兼容包'}，需要 ${system}/${cpu} 64 位）`)
 }
 
 export async function javaPackageSize(pkg: JavaPackage, head: (url: string) => Promise<Response>): Promise<number | undefined> {
@@ -72,8 +81,8 @@ export function javaNetworkError(error: unknown): string {
  * Layout under each base is /<major>/jre/<arch>/<os>/<archive> — arch before
  * os, the reverse of the official distribution hostnames. */
 export const JAVA_MIRRORS: readonly { label: string; base: string }[] = [
-  { label: '清华镜像', base: 'https://mirrors.tuna.tsinghua.edu.cn/Adoptium' },
   { label: '南大镜像', base: 'https://mirrors.nju.edu.cn/adoptium' },
+  { label: '清华镜像', base: 'https://mirrors.tuna.tsinghua.edu.cn/Adoptium' },
   { label: '中科大镜像', base: 'https://mirrors.ustc.edu.cn/adoptium' }
 ]
 
@@ -83,13 +92,18 @@ export function javaArchiveBaseName(url: string): string {
   try { return decodeURIComponent(new URL(url).pathname.split('/').pop() ?? '') } catch { return '' }
 }
 
-export async function mirrorPackage(target: JavaTarget, readText: ReadText): Promise<JavaPackage> {
+/** Every mirror archive that matches the target, in preferred order. A single
+ * first-hit mirror is not enough: one region can see a redirect loop on the
+ * first mirror while the next one answers normally, so the caller keeps the
+ * full list and only gives up after all of them fail. */
+export async function mirrorPackages(target: JavaTarget, readText: ReadText): Promise<{ packages: JavaPackage[]; errors: string[] }> {
   const { major, os, arch } = target
   const archPath = arch === 'aarch64' ? 'aarch64' : 'x64'
   const osPath = os === 'mac' ? 'mac' : os
   const suffix = os === 'windows' ? '.zip' : '.tar.gz'
   const wanted = new RegExp(`jre[_-]${archPath}[_-]${osPath}`, 'i')
   const errors: string[] = []
+  const packages: JavaPackage[] = []
   for (const mirror of JAVA_MIRRORS) {
     const dir = `${mirror.base}/${major}/jre/${archPath}/${osPath}/`
     try {
@@ -97,10 +111,22 @@ export async function mirrorPackage(target: JavaTarget, readText: ReadText): Pro
       const names = [...html.matchAll(/href="([^"?#]+\.(?:zip|tar\.gz))"/gi)].map(match => match[1].split('/').pop() ?? '')
       const selected = names.filter(name => name.toLowerCase().endsWith(suffix) && wanted.test(name)).sort().pop()
       if (!selected) { errors.push(`${mirror.label}：没有匹配 Java ${major} ${osPath}/${archPath} 的 JRE`); continue }
-      return { provider: `${mirror.label} Temurin`, url: new URL(selected, dir).href }
+      packages.push({ provider: `${mirror.label} Temurin`, url: new URL(selected, dir).href })
     } catch (error) { errors.push(`${mirror.label}：${javaNetworkError(error)}`) }
   }
-  throw new Error(errors.join('；') || `国内镜像没有匹配 Java ${major} ${osPath}/${archPath} 的 JRE`)
+  if (!packages.length) errors.push(`国内镜像没有匹配 Java ${major} ${osPath}/${archPath} 的 JRE`)
+  return { packages, errors }
+}
+
+/** Microsoft Build of OpenJDK: a Microsoft-operated CDN that is reliably reachable
+ * from mainland China. No public checksum sidecar, so it is treated like a mirror
+ * (structure + actually running the runtime before it is published). */
+export async function microsoftPackage(target: JavaTarget): Promise<JavaPackage> {
+  const { major, os, arch } = target
+  const platform = os === 'windows' ? 'windows' : os === 'mac' ? 'macos' : 'linux'
+  const archive = os === 'windows' ? '.zip' : '.tar.gz'
+  const url = `https://aka.ms/download-jdk/microsoft-jdk-${major}-${platform}-${arch === 'aarch64' ? 'aarch64' : 'x64'}${archive}`
+  return { provider: 'Microsoft OpenJDK', url }
 }
 
 export async function provisionJava<T>(target: JavaTarget, read: ReadJson, readText: ReadText, install: (pkg: JavaPackage) => Promise<T>, report: (text: string) => void, signal?: AbortSignal): Promise<T> {
@@ -110,23 +136,28 @@ export async function provisionJava<T>(target: JavaTarget, read: ReadJson, readT
   // Official metadata and a reachable mirror are requested together: the mirror
   // is often the only endpoint that answers, while the official SHA256 is worth
   // waiting for whenever it does arrive.
-  const attempt = async (work: () => Promise<JavaPackage>): Promise<{ pkg: JavaPackage | null; error: unknown }> =>
-    work().then(pkg => ({ pkg, error: null as unknown }), error => { signal?.throwIfAborted(); return { pkg: null, error } })
-  const [official, mirrored] = await Promise.all([
+  const attempt = async <T>(work: () => Promise<T>): Promise<{ value: T | null; error: unknown }> =>
+    work().then(value => ({ value, error: null as unknown }), error => { signal?.throwIfAborted(); return { value: null, error } })
+  const [official, mirrored, microsoft] = await Promise.all([
     attempt(() => temurinPackage(target, read)),
-    attempt(() => mirrorPackage(target, readText))
+    attempt(() => mirrorPackages(target, readText)),
+    attempt(async () => microsoftPackage(target)),
   ])
   signal?.throwIfAborted()
   const plan: JavaPackage[] = []
-  if (official.pkg && mirrored.pkg && javaArchiveBaseName(official.pkg.url) === javaArchiveBaseName(mirrored.pkg.url)) {
+  const mirroredPackages = mirrored.value
+  const mirrors: JavaPackage[] = mirroredPackages?.packages ?? []
+  let acceleratedUrl = ''
+  if (official.value) {
     // Same archive on both sides: take the mirror's transfer, keep the official hash.
-    plan.push({ ...official.pkg, provider: `${official.pkg.provider}（${mirrored.pkg.provider} 加速）`, url: mirrored.pkg.url })
-  } else {
-    if (official.pkg) plan.push(official.pkg)
-    else errors.push(`Adoptium：${javaNetworkError(official.error)}`)
-    if (mirrored.pkg) plan.push(mirrored.pkg)
-    else errors.push(`国内镜像：${javaNetworkError(mirrored.error)}`)
-  }
+    const twin = mirrors.find(pkg => javaArchiveBaseName(pkg.url) === javaArchiveBaseName(official.value!.url))
+    if (twin) { plan.push({ ...official.value, provider: `${official.value.provider}（${twin.provider} 加速）`, url: twin.url }); acceleratedUrl = twin.url }
+    else plan.push(official.value)
+  } else errors.push(`Adoptium：${javaNetworkError(official.error)}`)
+  for (const pkg of mirrors) if (pkg.url !== acceleratedUrl) plan.push(pkg)
+  errors.push(...(mirroredPackages?.errors ?? []))
+  if (microsoft.value) plan.push(microsoft.value)
+  else errors.push(`Microsoft：${javaNetworkError(microsoft.error)}`)
   for (const pkg of plan) {
     try { signal?.throwIfAborted(); return await install(pkg) }
     catch (error) { signal?.throwIfAborted(); errors.push(`${pkg.provider}：${javaNetworkError(error)}`) }

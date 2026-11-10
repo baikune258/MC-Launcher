@@ -158,12 +158,15 @@ export async function cancelTaskAndWait(id: string, timeoutMs = 30_000): Promise
   return true
 }
 
-/** 取消错误的统一判定（abort 信号抛出） */
+/** 取消错误的统一判定（abort 信号抛出）。
+ *  注意：网络超时同样会以 AbortError / “operation was aborted” 的形式抛出，
+ *  这类错误是失败而不是用户取消；否则一次下载超时会被上报成“任务已取消”，
+ *  把真实的失败原因藏起来。 */
 export function isCancelError(e: unknown): boolean {
-  return (
-    e instanceof Error &&
-    (e.message === '已取消' || e.name === 'AbortError' || /aborted|取消/i.test(e.message))
-  )
+  if (!(e instanceof Error)) return false
+  if (e.message === '已取消' || e.message === '任务已取消') return true
+  if (/timeout|timed out|超时|ECONNRESET|ECONNREFUSED|ETIMEDOUT|socket hang up/i.test(e.message)) return false
+  return e.name === 'AbortError' || /aborted|取消/i.test(e.message)
 }
 
 /** 阶段边界手动检查（下载循环之外的长流程节点调用） */
