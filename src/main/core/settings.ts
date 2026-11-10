@@ -146,6 +146,8 @@ export function getSettings(): Settings {
     cached = {
       ...def,
       ...raw,
+      // 旧配置里被写成 null 的数组字段会让设置页渲染整页空白，这里统一自愈为数组。
+      disabledFeatures: Array.isArray(raw.disabledFeatures) ? raw.disabledFeatures : def.disabledFeatures,
       uiWindowAutoFit: raw.uiWindowAutoFit === true,
       updateMirrorUrls: storedUpdateMirrorUrls(raw.updateMirrorUrls),
       rememberGameWindowSize: raw.rememberGameWindowSize === true,

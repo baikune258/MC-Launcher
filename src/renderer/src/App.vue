@@ -11,7 +11,7 @@ import { loadExitNotices, clearNotices } from './store'
 import { useNavigationBubble } from './composables/useNavigationBubble'
 import { usePlatformUpdate } from './composables/usePlatformUpdate'
 const { updateReadyMessage } = usePlatformUpdate()
-import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, provide, reactive, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onErrorCaptured, onMounted, onUnmounted, provide, reactive, ref, watch } from 'vue'
 import { MASCOT_INTERACTIVE } from './mascotInteraction'
 import type { Component } from 'vue'
 import { backgroundImageEffect } from '@shared/appearancePolicy'
@@ -70,10 +70,10 @@ import HomeView from './views/HomeView.vue'
 // 非首屏视图全部懒加载：首屏只打包/挂载 HomeView，其余视图拆独立 chunk 按需拉取
 // （渲染层常驻内存大头之一；配合 memTrim/idleTrim 的静默瘦身）。
 const InstanceCenter = defineAsyncComponent(() => import('./components/InstanceCenter.vue'))
-const GameView = defineAsyncComponent(() => import('./views/GameView.vue'))
-const ModsView = defineAsyncComponent(() => import('./views/ModsView.vue'))
-const RecordingsView = defineAsyncComponent(() => import('./views/RecordingsView.vue'))
-const ProjectionsView = defineAsyncComponent(() => import('./views/ProjectionsView.vue'))
+const GameView = asyncView(() => import('./views/GameView.vue'))
+const ModsView = asyncView(() => import('./views/ModsView.vue'))
+const RecordingsView = asyncView(() => import('./views/RecordingsView.vue'))
+const ProjectionsView = asyncView(() => import('./views/ProjectionsView.vue'))
 const MascotStage = defineAsyncComponent(() => import('./components/MascotStage.vue'))
 const mascotOpen = ref(false)
 const mascotReady = ref(false)
@@ -85,21 +85,22 @@ const mascotRef = ref<{flush:()=>Promise<void>}>()
 const mascotKeyboard = ref(false)
 function openMascots(event:MouseEvent){if(mascotOpen.value)return;mascotKeyboard.value=event.detail===0;mascotReady.value=false;mascotSoftware.value=false;mascotOpen.value=true}
 function closeMascots(){mascotOpen.value=false;mascotBusy.value=false;void nextTick(()=>document.querySelector<HTMLButtonElement>('.brand-avatar')?.focus())}
-const PacksView = defineAsyncComponent(() => import('./views/PacksView.vue'))
-const ShadersView = defineAsyncComponent(() => import('./views/ShadersView.vue'))
-const KeysView = defineAsyncComponent(() => import('./views/KeysView.vue'))
-const BridgeView = defineAsyncComponent(() => import('./views/BridgeView.vue'))
-const SkinsView = defineAsyncComponent(() => import('./views/SkinsView.vue'))
-const CommunityView = defineAsyncComponent(() => import('./views/CommunityView.vue'))
-const ServersView = defineAsyncComponent(() => import('./views/ServersView.vue'))
-const HostServerView = defineAsyncComponent(() => import('./views/HostServerView.vue'))
-const FriendConnectView = defineAsyncComponent(() => import('./views/FriendConnectView.vue'))
-const SettingsView = defineAsyncComponent(() => import('./views/SettingsView.vue'))
-const AccountsView = defineAsyncComponent(() => import('./views/AccountsView.vue'))
+const PacksView = asyncView(() => import('./views/PacksView.vue'))
+const ShadersView = asyncView(() => import('./views/ShadersView.vue'))
+const KeysView = asyncView(() => import('./views/KeysView.vue'))
+const BridgeView = asyncView(() => import('./views/BridgeView.vue'))
+const SkinsView = asyncView(() => import('./views/SkinsView.vue'))
+const CommunityView = asyncView(() => import('./views/CommunityView.vue'))
+const ServersView = asyncView(() => import('./views/ServersView.vue'))
+const HostServerView = asyncView(() => import('./views/HostServerView.vue'))
+const FriendConnectView = asyncView(() => import('./views/FriendConnectView.vue'))
+const SettingsView = asyncView(() => import('./views/SettingsView.vue'))
+const AccountsView = asyncView(() => import('./views/AccountsView.vue'))
 import brandHead from './assets/splash-face.png'
 
 // Vite 的全局 define 在 script 中解析；模板直接访问会被 Vue 当作组件实例字段。
 const appVersion = __APP_VERSION__
+import { asyncView } from './asyncView'
 import ModDropModal from './components/ModDropModal.vue'
 import WorldImportModal from './components/WorldImportModal.vue'
 
@@ -1165,6 +1166,14 @@ function onEditKeydown(e: KeyboardEvent) {
 
 // ---------------- 初始化与事件订阅 ----------------
 const offs: Array<() => void> = []
+
+// 视图渲染异常不再静默变成空白页：提示并记录，页面切走即可恢复。
+onErrorCaptured((error) => {
+  const message = error instanceof Error ? error.message : String(error)
+  console.error('[render]', error)
+  toast('页面渲染出错：' + message, 'error')
+  return false
+})
 
 onMounted(async () => {
   void pollTickets()

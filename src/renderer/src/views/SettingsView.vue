@@ -54,6 +54,7 @@ import { settingsCatalog, settingsCategories, settingsScopes, scopeOfCategory, s
 import { updateSettings } from '../settingsUpdates'
 import { refreshInstalled } from '../store'
 
+const asList = <T,>(value: T[] | null | undefined): T[] => (Array.isArray(value) ? value : [])
 const page = ref<HTMLElement | null>(null)
 /** 精确输入框自动聚焦 */
 const vFocus = { mounted: (el: HTMLElement) => el.focus() }
@@ -147,7 +148,7 @@ async function changeWindowFit(event: Event) {
   finally { windowFitBusy.value = false; input.checked = store.settings?.uiWindowAutoFit === true }
 }
 
-const defaultDownloadFolder = computed(() => store.settings?.folders.find(folder => folder.isDefault)?.path || store.settings?.activeFolder || store.settings?.gameDir || '')
+const defaultDownloadFolder = computed(() => (store.settings?.folders ?? []).find(folder => folder.isDefault)?.path || store.settings?.activeFolder || store.settings?.gameDir || '')
 const windowSizeBusy = ref(false)
 const canRememberWindow = window.kamucl.platform === 'win32'
 async function toggleWindowSize(event: Event) {
@@ -234,7 +235,7 @@ async function openRollback() {
   rollback.value.open = true
   rollback.value.loading = true
   try {
-    rollback.value.list = (await listUpdateReleases()).filter((r) => r.version !== appVersion)
+    rollback.value.list = asList(await listUpdateReleases()).filter((r) => r.version !== appVersion)
     if (!rollback.value.list.length) toast('没有可回退的历史版本', 'info')
   } catch (e) {
     toast('获取历史版本失败：' + errText(e), 'error')
@@ -374,7 +375,7 @@ async function onRefreshJava(refresh = true, announce = true) {
   javaScanText.value = '正在准备扫描全部本地固定磁盘…'
   javaScanProgress.value = 0
   try {
-    javas.value = await refreshJava(refresh)
+    javas.value = asList(await refreshJava(refresh))
     if (announce) toast('Java 扫描完成', 'success')
   } catch (e) {
     const message = errText(e)
@@ -396,12 +397,12 @@ async function onAddJava() {
       // 备选路径：手动输入完整路径（仍走 -version 校验）
       await addCustomJava(p)
       javaCustomInput.value = ''
-      javas.value = await listJava()
+      javas.value = asList(await listJava())
     } else {
       // 主路径：系统文件选择器定位 java.exe（空输入时点击「添加」即弹选择框）
       const list = await pickAddJava()
       if (!list) return // 用户取消选择
-      javas.value = list
+      javas.value = asList(list)
     }
     toast('已添加 Java', 'success')
   } catch (e) {
@@ -414,7 +415,7 @@ async function onAddJava() {
 async function onHideJava(p: string) {
   try {
     await hideJava(p)
-    javas.value = await listJava()
+    javas.value = asList(await listJava())
   } catch (e) {
     toast('操作失败：' + errText(e), 'error')
   }
@@ -423,7 +424,7 @@ async function onHideJava(p: string) {
 onMounted(async () => {
   void loadCertTrust()
   try {
-    javas.value = await listJava()
+    javas.value = asList(await listJava())
   } catch (e) {
     javaError.value = errText(e)
   } finally {
@@ -616,7 +617,7 @@ const pluginConfirmRemove = ref('')
 
 onMounted(async () => {
   try {
-    plugins.value = await listPlugins()
+    plugins.value = asList(await listPlugins())
   } catch { /* 插件列表失败不阻塞设置页 */ }
 })
 
@@ -625,7 +626,7 @@ async function onInstallPlugin() {
   pluginBusy.value = true
   try {
     const before = plugins.value.length
-    plugins.value = await installPlugin()
+    plugins.value = asList(await installPlugin())
     if (plugins.value.length > before) {
       pluginDirty.value = true
       toast('插件已安装，重载启动器后生效', 'success')
@@ -639,7 +640,7 @@ async function onInstallPlugin() {
 
 async function onTogglePlugin(p: PluginInfo, enabled: boolean) {
   try {
-    plugins.value = await setPluginEnabled(p.id, enabled)
+    plugins.value = asList(await setPluginEnabled(p.id, enabled))
     pluginDirty.value = true
   } catch (e) {
     toast('操作失败：' + errText(e), 'error')
@@ -654,7 +655,7 @@ async function onRemovePlugin(p: PluginInfo) {
   }
   pluginConfirmRemove.value = ''
   try {
-    plugins.value = await removePlugin(p.id)
+    plugins.value = asList(await removePlugin(p.id))
     pluginDirty.value = true
     toast(`插件已移入回收站：${p.name}`, 'success')
   } catch (e) {
@@ -701,7 +702,7 @@ async function onRemovePlugin(p: PluginInfo) {
             <span data-ui="SettingsView:ddd6149b4fc5" class="switch">
               <input data-ui="SettingsView:907bb2e68f36"
                 type="checkbox"
-                :checked="!store.settings.disabledFeatures.includes(f.key)"
+                :checked="!(store.settings.disabledFeatures ?? []).includes(f.key)"
                 @change="onToggleFeature(f.key, ($event.target as HTMLInputElement).checked)"
               />
               <span data-ui="SettingsView:5ef29076637c" class="switch-ui"></span>
@@ -722,7 +723,7 @@ async function onRemovePlugin(p: PluginInfo) {
         <h3 data-ui="SettingsView:c5658552d90d" class="group-title">默认下载位置</h3>
         <p data-ui="SettingsView:eb7e5618a756" class="muted group-hint">新游戏版本、整合包和共享资源（依赖库、游戏素材、自动下载的 Java）保存在此处。</p>
         <div data-ui="SettingsView:d32e87dadcdf" class="dir-row download-location-row">
-          <SelectMenu class="download-location-select" :model-value="defaultDownloadFolder" :options="store.settings.folders.map(folder => ({ value: folder.path, label: folder.name + (folder.isDefault ? '（默认）' : '') }))" :disabled="downloadFolderBusy" @change="applyDownloadFolder" />
+          <SelectMenu class="download-location-select" :model-value="defaultDownloadFolder" :options="(store.settings.folders ?? []).map(folder => ({ value: folder.path, label: folder.name + (folder.isDefault ? '（默认）' : '') }))" :disabled="downloadFolderBusy" @change="applyDownloadFolder" />
           <button class="btn btn-gold dir-btn" data-ui="download-location:change" :disabled="downloadFolderBusy" @click="chooseNewDownloadFolder">{{ downloadFolderBusy ? '更改中…' : '更改…' }}</button>
           <button class="btn btn-ghost dir-btn" data-ui="download-location:manage" :disabled="downloadFolderBusy" @click="store.currentView = 'game'">游戏文件夹管理</button>
         </div>
