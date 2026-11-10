@@ -1,6 +1,7 @@
 import AdmZip from 'adm-zip'
 import { parse as parseToml } from '@iarna/toml'
 import { dependencyRange } from '../../shared/modCompatibility'
+import { parseLenientJson } from './lenientJson'
 import type { LoaderName, ModInfo, ModRequirement } from '../../shared/types'
 
 const builtins = new Set(['minecraft', 'forge', 'neoforge', 'fabricloader', 'quilt_loader', 'java'])
@@ -25,7 +26,7 @@ export function parseModArchive(zip: AdmZip, filePath: string, fileName: string,
   try {
     const fabric = read('fabric.mod.json')
     if (fabric) {
-      const j = JSON.parse(fabric), dep = j.depends ?? {}
+      const j = parseLenientJson(fabric), dep = j.depends ?? {}
       if (j.environment !== 'server') {
         if (dep.java !== undefined) javaRequirements.push({ loader: 'fabric', source: `${fileName}: ${j.id}`, range: dependencyRange(dep.java) })
         if (j.breaks?.java !== undefined) javaRequirements.push({ loader: 'fabric', source: `${fileName}: ${j.id}`, range: dependencyRange(j.breaks.java), exclude: true })
@@ -36,7 +37,7 @@ export function parseModArchive(zip: AdmZip, filePath: string, fileName: string,
     }
     const quilt = read('quilt.mod.json')
     if (quilt) {
-      const j = JSON.parse(quilt).quilt_loader ?? {}
+      const j = parseLenientJson(quilt).quilt_loader ?? {}
       const deps: RecordValue = {}
       for (const raw of j.depends ?? []) {
         const d = typeof raw === 'string' ? { id: raw, versions: '*' } : raw
@@ -78,7 +79,7 @@ export function parseModArchive(zip: AdmZip, filePath: string, fileName: string,
     if (!records.length) {
       const legacy = read('mcmod.info')
       if (legacy) {
-        const j = JSON.parse(legacy), mods = Array.isArray(j) ? j : j.modList
+        const j = parseLenientJson(legacy), mods = Array.isArray(j) ? j : j.modList
         for (const m of mods ?? []) {
           const req = (m.requiredMods ?? m.dependencies ?? []).filter((s: unknown) => typeof s === 'string').map((s: string) => {
             const [id, range = '*'] = s.replace(/^required-(?:after|before):/, '').split('@')
@@ -95,7 +96,7 @@ export function parseModArchive(zip: AdmZip, filePath: string, fileName: string,
     info.variants = records.map(r => ({ loader: r.loader, mcRange: r.mcRange, loaderRange: r.loaderRange, requirements: r.requirements }))
     provides.push(...records.map(r => ({ id: r.id, version: r.version })))
     const jarjar = read('META-INF/jarjar/metadata.json')
-    if (jarjar) nested.push(...(JSON.parse(jarjar).jars ?? []).map((j: RecordValue) => j.path))
+    if (jarjar) nested.push(...(parseLenientJson(jarjar).jars ?? []).map((j: RecordValue) => j.path))
     if (depth < 3) for (const name of [...new Set(nested)].slice(0, 64)) {
       const e = zip.getEntry(name)
       if (!e || e.header.size > 64 * 1024 * 1024) continue
