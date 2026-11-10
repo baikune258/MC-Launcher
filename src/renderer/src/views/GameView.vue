@@ -44,6 +44,7 @@ import FavoriteModsPicker from '../components/FavoriteModsPicker.vue'
 import UiGlyph from '../components/UiGlyph.vue'
 import VersionCategoriesPanel from '../components/VersionCategoriesPanel.vue'
 import { VERSION_CATEGORY_ALL, VERSION_CATEGORY_FAVORITES, VERSION_CATEGORY_UNCLASSIFIED, versionCategoryOf, versionMatchesCategory } from '@shared/versionCategories'
+import { isAprilFools } from '@shared/versionPicker'
 const favoritesReady = ref(true)
 import ThumbnailPickerModal from '../components/ThumbnailPickerModal.vue'
 import type {
@@ -360,13 +361,14 @@ onMounted(() => {
 })
 
 // ---------------- 搜索与筛选（搜索框联动顶栏 store.searchKeyword） ----------------
-type TypeFilter = 'all' | 'release' | 'snapshot' | 'old'
+type TypeFilter = 'all' | 'release' | 'snapshot' | 'aprilfools' | 'old'
 const typeFilter = ref<TypeFilter>('release')
 
 const typeFilters: Array<{ value: TypeFilter; label: string }> = [
   { value: 'release', label: '正式版' },
   { value: 'all', label: '全部' },
   { value: 'snapshot', label: '快照' },
+  { value: 'aprilfools', label: '愚人节' },
   { value: 'old', label: '旧版' }
 ]
 
@@ -398,6 +400,7 @@ const filtered = computed(() =>
   manifest.value.filter((v) => {
     if (keyword.value && !v.id.toLowerCase().includes(keyword.value)) return false
     if (typeFilter.value === 'all') return true
+    if (typeFilter.value === 'aprilfools') return isAprilFools(v)
     if (typeFilter.value === 'old') return v.type === 'old_beta' || v.type === 'old_alpha'
     return v.type === typeFilter.value
   })
