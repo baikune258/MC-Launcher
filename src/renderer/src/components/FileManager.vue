@@ -5,7 +5,7 @@
  */
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { getModIcons, importResources, applyModUpdates, checkModUpdates, copyText, errText, fsPath, listFs, openDir, removeFs, toggleDisableFs } from '../api'
-import { displayVersionName as versionLabel, activeInstalled, selectedInstance, refreshInstalled, store, toast } from '../store'
+import { displayVersionName as versionLabel, activeInstalled, selectedInstance, refreshInstalled, store, toast, communityBrowsePreset } from '../store'
 import { resourceDisplayName, pageSelection } from '@shared/uiPresentation'
 import ContentSkeleton from './ContentSkeleton.vue'
 import ModMigrationModal from './ModMigrationModal.vue'
@@ -34,6 +34,18 @@ const props = defineProps<{
   /** 标题旁与空状态的内联 SVG 图标 */
   icon: string
 }>()
+
+/** 下载入口跳到社区资源页：带入当前实例的 MC 版本与加载器，进入即可浏览与搜索 */
+const browseKind = computed(() => props.rel === 'mods' ? 'mod' as const : props.rel === 'resourcepacks' ? 'resourcepack' as const : 'shader' as const)
+const browseLabel = computed(() => props.rel === 'mods' ? '下载模组' : props.rel === 'resourcepacks' ? '下载资源包' : '下载光影')
+function onBrowseDownload() {
+  const v = currentVersion.value
+  if (!v) return
+  communityBrowsePreset.kind = browseKind.value
+  communityBrowsePreset.mcVersion = v.mcVersion ?? ''
+  communityBrowsePreset.loader = v.loader ?? ''
+  store.currentView = 'community'
+}
 
 const page = ref(1)
 const PAGE_SIZE = 100
@@ -337,7 +349,8 @@ function toggleUpdateSelect(fileName: string, checked: boolean) {
     <header class="fm-head">
       <div data-ui="FileManager:9ace27a3aaa9" class="page-head fm-head-left"><h1 data-ui="FileManager:72e6bc71f100" class="page-title">{{ props.title }} <small v-if="currentVersion && !loading">{{ resourceCount }}</small></h1></div>
       <div data-ui="FileManager:7a94152a1114" class="fm-actions">
-        <button v-if="props.rel === 'mods'" class="btn btn-gold" :disabled="updatePanel.checking || !currentVersion" @click="onCheckUpdates">{{ updatePanel.checking ? '检测中…' : '检测更新' }}</button>
+        <button class="btn btn-gold" :disabled="!currentVersion" @click="onBrowseDownload">{{ browseLabel }}</button>
+        <button v-if="props.rel === 'mods'" class="btn btn-ghost" :disabled="updatePanel.checking || !currentVersion" @click="onCheckUpdates">{{ updatePanel.checking ? '检测中…' : '检测更新' }}</button>
         <button class="btn" :class="props.rel === 'shaderpacks' ? 'btn-gold' : 'btn-ghost'" :disabled="opening || !currentVersion" @click="onOpenDir">{{ props.openLabel }}</button>
         <details data-ui="FileManager:4aeae736e670" v-if="props.rel === 'mods'" class="file-more" @keydown.esc="($event.currentTarget as HTMLDetailsElement).open=false"><summary class="btn btn-ghost" aria-label="模组管理更多操作">更多</summary><div data-ui="FileManager:bd84b9640929" class="file-more-actions" @click="($event.currentTarget as HTMLElement).closest('details')?.removeAttribute('open')"><button class="btn btn-ghost" :disabled="!currentVersion" @click="migrationOpen=true">版本迁移</button><button class="btn btn-ghost" :disabled="!currentVersion" @click="dupOpen=true">清理重复</button></div></details>
       </div>

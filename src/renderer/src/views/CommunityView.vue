@@ -2,7 +2,7 @@
 import ContentSkeleton from '../components/ContentSkeleton.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { communityFiles, communitySearch, errText, getManifest, getModTargets, listHostServers } from '../api'
-import { store, toast, selectedInstance, displayVersionName as versionLabel, communityPackPreset } from '../store'
+import { store, toast, selectedInstance, displayVersionName as versionLabel, communityPackPreset, communityBrowsePreset } from '../store'
 import { instanceKey } from '@shared/modCompatibility'
 import { communityFileMatchesInstance, usesCommunityLoader } from '@shared/communityPolicy'
 import { mcmodSearchUrl } from '@shared/communityLinks'
@@ -162,7 +162,25 @@ if (communityPackPreset.kind) {
   communityPackPreset.kind = null
   communityPackPreset.sort = null
 }
-const versionSelection = reactive(initialCommunityVersionSelection(previousSession))
+// 模组/资源包/光影页「下载」入口预设：带入该实例的 MC 版本与加载器，按下载量浏览
+let browsePresetApplied = false
+if (communityBrowsePreset.kind) {
+  query.kind = communityBrowsePreset.kind
+  query.sort = 'downloads'
+  const presetVersion = communityBrowsePreset.mcVersion.trim()
+  if (presetVersion) {
+    query.mcVersion = presetVersion
+    versionInput.value = presetVersion
+  }
+  if (communityBrowsePreset.loader) query.loader = communityBrowsePreset.loader as typeof query.loader
+  browsePresetApplied = true
+  communityBrowsePreset.kind = null
+  communityBrowsePreset.mcVersion = ''
+  communityBrowsePreset.loader = ''
+}
+const versionSelection = reactive(browsePresetApplied
+  ? { source: query.mcVersion ? 'custom' as const : 'all' as const, instance: '', loaderSource: query.loader ? 'manual' as const : 'all' as const }
+  : initialCommunityVersionSelection(previousSession))
 const installedVersionOptions = computed(() => store.installed.filter(usableCommunityInstance).map(v => ({
   value: instanceKey(v), label: versionLabel(v), description: `Minecraft ${v.mcVersion} · ${v.loader || '原版'} · ${v.folder}`
 })))
@@ -350,7 +368,8 @@ function onReset() {
 onMounted(async () => {
   // A route-local snapshot keeps the query, loaded pages and scroll without retaining DOM.
   const newKeyword = store.searchKeyword.trim()
-  if (packPresetApplied || !previousSession || (newKeyword && newKeyword !== previousSession.topKeyword.trim())) { query.keyword = newKeyword; void doSearch(true) }
+  // 与其它启动器一致：没输入关键词也先列出热门资源，可继续翻页浏览
+  if (packPresetApplied || browsePresetApplied || !previousSession || !previousSession.searched || (newKeyword && newKeyword !== previousSession.topKeyword.trim())) { query.keyword = newKeyword; void doSearch(true) }
   else {
     await nextTick()
     const content = document.querySelector<HTMLElement>('.content')

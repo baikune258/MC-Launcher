@@ -141,6 +141,9 @@ export const mpInstall = reactive({
  *  必须用可空对象而非可空引用。 */
 export const communityPackPreset = reactive<{ kind: 'modpack' | null; sort: 'downloads' | null }>({ kind: null, sort: null })
 
+/** 模组/资源包/光影页「下载」入口预设：带入当前实例的 MC 版本与加载器，打开社区资源页即搜。 */
+export const communityBrowsePreset = reactive<{ kind: 'mod' | 'resourcepack' | 'shader' | null; mcVersion: string; loader: string }>({ kind: null, mcVersion: '', loader: '' })
+
 const normalizeFolder = (value = '') => value.replaceAll('\\', '/').replace(/\/$/, '').toLowerCase()
 export const activeInstalled = computed(() => store.installed.filter(v => !v.folder || normalizeFolder(v.folder) === normalizeFolder(store.settings?.activeFolder || store.settings?.gameDir)))
 export const selectedInstance = computed(() => activeInstalled.value.find(v => v.id === store.resourceVersionId) ?? activeInstalled.value[0])
