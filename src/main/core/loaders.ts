@@ -244,7 +244,25 @@ function runInstallerUnlocked(javaPath: string, jar: string, emit: ProgressEmit,
       }
       const allLines: string[] = []
       let tail = ''
+      // 安装器没有任何输出通常是它在等一个不再响应的下载源（Forge 安装器会为每个
+      // 库打印 Downloading 行）。无输出超过阈值就杀掉进程，让上层切官方源重试，
+      // 而不是让整个整合包安装永远停在同一个百分比。
+      const idleMs = Number(process.env.KAMUCL_INSTALLER_IDLE_MS) > 1000 ? Number(process.env.KAMUCL_INSTALLER_IDLE_MS) : 300_000
+      let lastOutputAt = Date.now()
+      let stallError: Error | null = null
+      const watchdog = setInterval(() => {
+        if (Date.now() - lastOutputAt < idleMs) return
+        stallError = new Error(`加载器安装器 ${Math.round(idleMs / 60_000)} 分钟没有任何输出，已停止（通常是加载器依赖下载源卡住）`)
+        loaderLog.error(String(stallError.message))
+        try {
+          proc.kill()
+        } catch {
+          /* 忽略 */
+        }
+      }, Math.min(20_000, Math.max(5_000, Math.round(idleMs / 10))))
+      watchdog.unref?.()
       const onData = (d: Buffer): void => {
+        lastOutputAt = Date.now()
         const lines = (tail + d.toString('utf-8')).split(/\r?\n/)
         tail = lines.pop() ?? ''
         for (const l of lines) if (l.trim()) allLines.push(l)
@@ -258,6 +276,7 @@ function runInstallerUnlocked(javaPath: string, jar: string, emit: ProgressEmit,
       })
       // close 保证 stdout/stderr 已关闭；取消 IPC 只有到这里才可确认安装器真正停止。
       proc.on('close', (code) => {
+        clearInterval(watchdog)
         signal?.removeEventListener('abort', onAbort)
         if (tail.trim()) allLines.push(tail)
         // 全量输出落盘，便于排查
@@ -273,6 +292,7 @@ function runInstallerUnlocked(javaPath: string, jar: string, emit: ProgressEmit,
           /* 日志写盘失败不影响流程 */
         }
         if (cancelled || signal?.aborted) reject(new Error('已取消'))
+        else if (stallError) reject(stallError)
         else if (spawnError) {
           loaderLog.error(`安装器进程异常：${String(spawnError)}`)
           reject(spawnError)

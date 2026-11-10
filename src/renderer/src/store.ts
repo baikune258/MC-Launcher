@@ -133,7 +133,8 @@ export const mpInstall = reactive({
   speed: undefined as number | undefined,
   etaSeconds: undefined as number | undefined,
   bytesDone: undefined as number | undefined,
-  bytesTotal: undefined as number | undefined
+  bytesTotal: undefined as number | undefined,
+  stages: [] as { id: string; label?: string; text?: string; progress?: number; state?: string }[]
 })
 
 /** 社区整合包库预设（游戏版本页「整合包库」入口写入，CommunityView 挂载时消费后清空）。

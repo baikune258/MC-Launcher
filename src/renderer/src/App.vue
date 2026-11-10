@@ -1214,6 +1214,7 @@ onMounted(async () => {
         if (!mpInstall.name && e.taskTitle) mpInstall.name = (e.taskTitle.split('导入整合包 ')[1] ?? '').trim()
         mpInstall.progress = e.overall ?? e.progress
         mpInstall.text = e.text
+        mpInstall.stages = (e.parallelStages ?? []).map(s => ({ id: s.id, label: s.label, text: s.text, progress: s.progress, state: s.state }))
         mpInstall.speed = e.speed
         mpInstall.etaSeconds = e.etaSeconds
         if (e.bytesDone != null) mpInstall.bytesDone = e.bytesDone
@@ -1862,6 +1863,13 @@ onUnmounted(() => {
           <span v-if="mpInstall.etaSeconds != null">· 剩余 {{ formatEta(mpInstall.etaSeconds) }}</span>
           <span v-else-if="mpInstall.bytesDone != null && mpInstall.bytesTotal != null">· {{ fmtBytes(mpInstall.bytesDone) }} / {{ fmtBytes(mpInstall.bytesTotal) }}</span>
         </div>
+        <ul v-if="mpInstall.stages.length" class="pack-install-stages" data-ui="App:mpinstall-stages">
+          <li v-for="lane in mpInstall.stages" :key="lane.id" :class="{ 'is-done': lane.state === 'done' }">
+            <span class="lane-name">{{ lane.label }}</span>
+            <span class="lane-text">{{ lane.text || '正在准备…' }}</span>
+            <span class="lane-pct">{{ lane.state === 'done' ? '完成' : Math.round(Math.min(1, lane.progress ?? 0) * 100) + '%' }}</span>
+          </li>
+        </ul>
         <p class="muted pack-install-tip">安装全程在后台进行，可最小化窗口继续浏览启动器其他内容</p>
       </div>
     </div>
@@ -1876,6 +1884,12 @@ onUnmounted(() => {
    The original glass rules resume immediately when the LOGO is restored. */
 .shell.mascots-active,.shell.mascots-active :deep(*){backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
 .brand-slot{position:relative;z-index:5;width:48px;height:72px;flex-shrink:0;display:grid;place-items:center}.brand-avatar{display:block;background:transparent;border:0;padding:0;border-radius:12px;cursor:pointer;transition:opacity .38s,transform .38s;flex-shrink:0}.brand-avatar:focus-visible{outline:2px solid var(--accent);outline-offset:4px}.brand-avatar.avatar-preparing{opacity:.75;transform:scale(.94)}.brand-avatar.avatar-open{opacity:0;transform:translateY(-14px) scale(.65);pointer-events:none}
+.pack-install-stages{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:6px}
+.pack-install-stages li{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:baseline;font-size:12.5px;color:var(--text-dim)}
+.pack-install-stages li .lane-name{color:var(--text);opacity:.85;min-width:7.5em}
+.pack-install-stages li .lane-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.8}
+.pack-install-stages li .lane-pct{font-variant-numeric:tabular-nums;opacity:.75}
+.pack-install-stages li.is-done .lane-name,.pack-install-stages li.is-done .lane-text{opacity:.5}
 /* 配置不兼容弹窗 */
 @media (prefers-reduced-motion: reduce) { .brand-avatar { transition-duration: .1s; } }
 .cfg-mismatch-mask { z-index: 9600; display: grid; place-items: center; }
