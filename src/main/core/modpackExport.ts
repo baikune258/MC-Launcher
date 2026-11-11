@@ -49,10 +49,13 @@ export interface ModpackExportRequest {
   version?: string
   /** 额外把 options.txt 带上（键位/视频设置等作者预设） */
   includeOptions?: boolean
+  /** zip = 通用压缩包（游戏目录直压，任何解压软件/AI 都能读）；mrpack = Modrinth 标准包 */
+  format?: 'zip' | 'mrpack'
 }
 
 export interface ModpackExportResult {
   path: string
+  format: 'zip' | 'mrpack'
   name: string
   version: string
   /** 交给启动器在线下载的模组数 */
@@ -181,6 +184,40 @@ function packDependencies(
   return deps
 }
 
+
+type ZipEntry = { kind: 'file'; name: string; abs: string } | { kind: 'buffer'; name: string; data: Buffer }
+
+/** 原子写 ZIP：先写临时文件再改名，避免中途失败留下半截包 */
+async function writeZip(outputPath: string, entries: ZipEntry[]): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const zip = new yazl.ZipFile()
+    const temporary = `${outputPath}.${crypto.randomUUID()}.tmp`
+    const stream = fs.createWriteStream(temporary)
+    stream.on('close', () => {
+      try {
+        fs.renameSync(temporary, outputPath)
+        resolve()
+      } catch (error) {
+        reject(error)
+      }
+    })
+    stream.on('error', (error) => {
+      try {
+        fs.rmSync(temporary, { force: true })
+      } catch {
+        /* ignore */
+      }
+      reject(error)
+    })
+    zip.outputStream.pipe(stream)
+    for (const entry of entries) {
+      if (entry.kind === 'file') zip.addFile(entry.abs, entry.name)
+      else zip.addBuffer(entry.data, entry.name)
+    }
+    zip.end()
+  })
+}
+
 export async function exportInstanceModpack(
   target: InstalledVersion & { folder?: string },
   outputPath: string,
@@ -211,6 +248,52 @@ export async function exportInstanceModpack(
     }
   }
   if (!files.length) throw new Error('这个实例里没有可打包的模组或配置，请先安装模组再导出')
+
+  const format: 'zip' | 'mrpack' = opts.format === 'mrpack' ? 'mrpack' : 'zip'
+  const deps = packDependencies(target, json)
+  const loaderText = Object.entries(deps)
+    .filter(([key]) => key !== 'minecraft')
+    .map(([key, value]) => `${key} ${value}`)
+    .join('、')
+
+  if (format === 'zip') {
+    // 通用 ZIP：mods/ 与 config/ 直接放在压缩包根，任何启动器、解压软件和 AI 都能直接看目录。
+    const listing = files
+      .map((file) => `${file.rel}\t${file.size}`)
+      .sort()
+      .join('\n')
+    const readme = [
+      `整合包名称：${name}`,
+      `整合包版本：${version}`,
+      `Minecraft：${deps.minecraft || '未知'}`,
+      `加载器：${loaderText || '原版（未装加载器）'}`,
+      `导出时间：${new Date().toLocaleString('zh-CN')}`,
+      `文件数：${files.length}`,
+      '',
+      '压缩包根目录就是游戏目录：mods/ 为模组，config/ 为配置，resourcepacks/ 为资源包，shaderpacks/ 为光影。',
+      '不包含存档、截图、日志与游戏本体，导入后需要自行安装对应版本与加载器。',
+      '',
+      '文件清单（相对路径 / 字节）：',
+      listing
+    ].join('\n')
+    const manifest = {
+      format: 'kamucl-zip-pack',
+      name,
+      version,
+      minecraft: deps.minecraft || '',
+      loader: deps.minecraft && loaderText ? loaderText : '',
+      exportedAt: new Date().toISOString(),
+      files
+    }
+    await writeZip(outputPath, [
+      { kind: 'buffer', name: '整合包信息.txt', data: Buffer.from(readme, 'utf8') },
+      { kind: 'buffer', name: 'kamucl-pack.json', data: Buffer.from(JSON.stringify(manifest, null, 2), 'utf8') },
+      ...files.map((file) => ({ kind: 'file' as const, name: file.rel, abs: file.abs }))
+    ])
+    const bytes = fs.statSync(outputPath).size
+    exportLog.info(`已导出通用整合包 ${path.basename(outputPath)}（${name} ${version}）：${files.length} 个文件，${bytes} 字节`)
+    return { path: outputPath, format, name, version, linked: 0, bundled: files.length, bytes }
+  }
 
   const modJars = files.filter((f) => /^mods\/[^/]+\.jar$/i.test(f.rel))
   const hashes = modJars.map((f) => sha1Of(f.abs))
@@ -252,36 +335,15 @@ export async function exportInstanceModpack(
     dependencies: packDependencies(target, json)
   }
 
-  await new Promise<void>((resolve, reject) => {
-    const zip = new yazl.ZipFile()
-    const temporary = `${outputPath}.${crypto.randomUUID()}.tmp`
-    const stream = fs.createWriteStream(temporary)
-    zip.addBuffer(Buffer.from(JSON.stringify(index, null, 2), 'utf8'), 'modrinth.index.json')
-    for (const file of bundled) zip.addFile(file.abs, `overrides/${file.rel}`)
-    zip.outputStream.pipe(stream)
-    stream.on('close', () => {
-      try {
-        fs.renameSync(temporary, outputPath)
-        resolve()
-      } catch (error) {
-        reject(error)
-      }
-    })
-    stream.on('error', (error) => {
-      try {
-        fs.rmSync(temporary, { force: true })
-      } catch {
-        /* ignore */
-      }
-      reject(error)
-    })
-    zip.end()
-  })
+  await writeZip(outputPath, [
+    { kind: 'buffer', name: 'modrinth.index.json', data: Buffer.from(JSON.stringify(index, null, 2), 'utf8') },
+    ...bundled.map((file) => ({ kind: 'file' as const, name: `overrides/${file.rel}`, abs: file.abs }))
+  ])
 
   const bytes = fs.statSync(outputPath).size
   exportLog.info(
     `已导出整合包 ${path.basename(outputPath)}（${name} ${version}）：在线引用 ${linked.length} 个，随包 ${bundled.length} 个，${bytes} 字节`
   )
   if (skipped.length) exportLog.warn(`以下文件超过 ${MAX_BUNDLED_BYTES} 字节被跳过：${skipped.slice(0, 5).join('、')}`)
-  return { path: outputPath, name, version, linked: linked.length, bundled: bundled.length, bytes }
+  return { path: outputPath, format, name, version, linked: linked.length, bundled: bundled.length, bytes }
 }

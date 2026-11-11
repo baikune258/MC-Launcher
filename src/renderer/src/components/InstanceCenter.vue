@@ -16,7 +16,7 @@ const form=ref<''|'clone'|'restore'|'import'|'disable'|'dependencies'>(''),name=
 const dependencies=ref<ModChangePlan>()
 const selectedMods=ref<string[]>([])
 const worldInput=ref(''),worldInfo=ref<WorldImportInfo>(),candidate=ref(''),mismatch=ref(false)
-const packName=ref(target.id),packVersion=ref('1.0.0')
+const packName=ref(target.id),packVersion=ref('1.0.0'),packFormat=ref<'zip'|'mrpack'>('zip')
 const sections=[['overview','概览'],['worlds','存档'],['screenshots','截图'],['backups','备份'],['diagnostics','诊断']]
 const folders=computed(()=>(store.settings?.folders||[]).map(f=>({value:f.path,label:f.name})))
 const filtered=computed(()=>worlds.value.filter(w=>w.name.toLowerCase().includes(search.value.toLowerCase())))
@@ -59,7 +59,7 @@ onUnmounted(()=>{document.removeEventListener('keydown',key,true);previousFocus?
      <template v-else-if="tab==='overview'">
       <div class="ic-summary" data-ui="instance-center:overview"><div><h3>你的游戏，独立管理</h3><p class="ic-path">{{overview?.directory}}</p></div><button class="btn btn-ghost" @click="perform(()=>invoke(IPC.centerFile,target,'directory',''))">打开目录</button></div>
       <div class="ic-grid"><button class="ic-card" @click="navigate('mods')"><strong>模组管理 →</strong><span>版本、启停与兼容性</span></button><button class="ic-card" @click="navigate('packs')"><strong>资源包 →</strong><span>管理材质与界面资源</span></button><button class="ic-card" @click="navigate('shaders')"><strong>光影包 →</strong><span>管理游戏光影</span></button><button class="ic-card" @click="navigate('game')"><strong>版本设置 →</strong><span>Java、窗口与隔离设置</span></button></div>
-      <div class="ic-card"><h3>导出整合包</h3><p>把当前实例的模组与配置打包成 .mrpack，Modrinth App、HMCL、PCL 和本启动器都能直接导入。存档、截图、日志与游戏本体不会进包。</p><div class="ic-tools"><label>整合包名称<input v-model="packName" class="input" maxlength="120" aria-label="整合包名称"/></label><label>版本<input v-model="packVersion" class="input" maxlength="40" aria-label="整合包版本"/></label></div><button class="btn btn-gold" :disabled="busy||overview?.running" @click="perform(()=>exportModpack(target,{name:packName,version:packVersion}))">导出整合包</button></div>
+      <div class="ic-card"><h3>导出整合包</h3><p>把当前实例的模组与配置打包带走，存档、截图、日志与游戏本体不会进包。通用 ZIP 任何解压软件和 AI 都能直接查看；.mrpack 适合 Modrinth App、HMCL、PCL 导入。</p><div class="ic-tools"><label>整合包名称<input v-model="packName" class="input" maxlength="120" aria-label="整合包名称"/></label><label>版本<input v-model="packVersion" class="input" maxlength="40" aria-label="整合包版本"/></label><label>格式<SelectMenu v-model="packFormat" :options="[{value:'zip',label:'通用 ZIP（推荐）'},{value:'mrpack',label:'Modrinth .mrpack'}]"/></label></div><button class="btn btn-gold" :disabled="busy||overview?.running" @click="perform(()=>exportModpack(target,{name:packName,version:packVersion,format:packFormat}))">导出整合包</button></div>
       <div class="ic-card"><h3>复制一个独立实例</h3><p>保留模组、配置与锁定状态，原实例保持完整。可在副本里尝试新的模组组合。</p><button class="btn btn-gold" :disabled="busy||overview?.running" @click="name=target.id+'-副本';form='clone'">复制实例</button></div>
      </template>
      <template v-else-if="tab==='worlds'">

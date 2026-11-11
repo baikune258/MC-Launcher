@@ -523,15 +523,23 @@ export function registerIpc(getWin: () => BrowserWindow | null): void {
   // 把实例导出成标准 .mrpack：弹保存对话框，返回导出摘要；取消返回 null
   ipcMain.handle(
     IPC.modpackExport,
-    async (_e, target: InstalledVersion & { folder?: string }, opts?: { name?: string; version?: string; includeOptions?: boolean }) => {
+    async (
+      _e,
+      target: InstalledVersion & { folder?: string },
+      opts?: { name?: string; version?: string; includeOptions?: boolean; format?: 'zip' | 'mrpack' }
+    ) => {
       const id = String(target?.id ?? '')
       if (!id) throw new Error('缺少实例信息')
+      const format: 'zip' | 'mrpack' = opts?.format === 'mrpack' ? 'mrpack' : 'zip'
       const safe = (String(opts?.name || target?.modpackName || id)).replace(/[\\/:*?"<>|]/g, '').trim() || id
       const win = getWin()
       const dialogOpts: Electron.SaveDialogOptions = {
         title: '导出整合包',
-        defaultPath: `${safe}-${String(opts?.version || target?.modpackVersion || '1.0.0')}.mrpack`,
-        filters: [{ name: 'Modrinth 整合包', extensions: ['mrpack'] }]
+        defaultPath: `${safe}-${String(opts?.version || target?.modpackVersion || '1.0.0')}.${format === 'mrpack' ? 'mrpack' : 'zip'}`,
+        filters:
+          format === 'mrpack'
+            ? [{ name: 'Modrinth 整合包', extensions: ['mrpack'] }]
+            : [{ name: 'ZIP 压缩包', extensions: ['zip'] }]
       }
       const picked = win ? await dialog.showSaveDialog(win, dialogOpts) : await dialog.showSaveDialog(dialogOpts)
       if (picked.canceled || !picked.filePath) return null
@@ -541,7 +549,8 @@ export function registerIpc(getWin: () => BrowserWindow | null): void {
           folder: target?.folder,
           name: opts?.name,
           version: opts?.version,
-          includeOptions: opts?.includeOptions !== false
+          includeOptions: opts?.includeOptions !== false,
+          format
         })
       )
     }

@@ -436,9 +436,10 @@ export const exportModpack = (target: {
   loaderVersion?: string
   modpackName?: string
   modpackVersion?: string
-}, opts?: { name?: string; version?: string; includeOptions?: boolean }) =>
+}, opts?: { name?: string; version?: string; includeOptions?: boolean; format?: 'zip' | 'mrpack' }) =>
   invoke<{
     path: string
+    format: 'zip' | 'mrpack'
     name: string
     version: string
     linked: number
