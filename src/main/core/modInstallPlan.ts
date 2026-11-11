@@ -223,7 +223,10 @@ export async function executeModPlan(id: string, includeDependencies: boolean, r
           if (pinnedPaths.has(mod.filePath)) throw new Error(`前置版本冲突：${mod.id} 要求精确版本 ${pinnedPaths.get(mod.filePath)!.fileId}，本次安装的 ${existing.fileName} 已内置其他版本；未写入任何 MOD，请重新检测`)
           continue
         }
-        if (pinnedPaths.has(mod.filePath)) throw new Error(`前置版本冲突：${mod.id} 要求精确版本 ${pinnedPaths.get(mod.filePath)!.fileId}，已有 ${existing.version || '其他版本'}；未写入任何 MOD，请先处理旧文件后重新检测`)
+        // A pinned edge is satisfied by the exact file staged above, so the
+        // older copy already in the mods folder is replaced instead of aborting
+        // the whole transaction: refusing here left users stuck on
+        //「sodium 要求精确版本 …，已有 0.5.13」with nothing installed.
         // Replace an older copy already sitting in the instance. The old file
         // is never deleted: it is renamed to *.disabled so it stops loading and
         // can still be restored by the user.
