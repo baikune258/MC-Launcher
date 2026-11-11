@@ -45,6 +45,7 @@ import type {
   GameResolution,
   ImageFit,
   InstallOptions,
+  InstalledVersion,
   LaunchState,
   LoaderName,
   ModpackInstallRequest,
@@ -76,6 +77,7 @@ import * as modBridge from './core/modBridge'
 import * as gamedir from './core/gamedir'
 import { folderOfVersion, instanceIconsDir, withDownloadFolder, withGameFolder } from './core/paths'
 import * as modpacks from './core/modpacks'
+import * as modpackExport from './core/modpackExport'
 import * as skins from './core/skins'
 import * as community from './core/community'
 import {
@@ -518,6 +520,32 @@ export function registerIpc(getWin: () => BrowserWindow | null): void {
     if (selection.canceled) return { accepted: 0, remaining: files.length, rejected: [] }
     return supplyModpackFiles(String(token), selection.filePaths)
   })
+  // 把实例导出成标准 .mrpack：弹保存对话框，返回导出摘要；取消返回 null
+  ipcMain.handle(
+    IPC.modpackExport,
+    async (_e, target: InstalledVersion & { folder?: string }, opts?: { name?: string; version?: string; includeOptions?: boolean }) => {
+      const id = String(target?.id ?? '')
+      if (!id) throw new Error('缺少实例信息')
+      const safe = (String(opts?.name || target?.modpackName || id)).replace(/[\\/:*?"<>|]/g, '').trim() || id
+      const win = getWin()
+      const dialogOpts: Electron.SaveDialogOptions = {
+        title: '导出整合包',
+        defaultPath: `${safe}-${String(opts?.version || target?.modpackVersion || '1.0.0')}.mrpack`,
+        filters: [{ name: 'Modrinth 整合包', extensions: ['mrpack'] }]
+      }
+      const picked = win ? await dialog.showSaveDialog(win, dialogOpts) : await dialog.showSaveDialog(dialogOpts)
+      if (picked.canceled || !picked.filePath) return null
+      return withGameFolder(target?.folder || folderOfVersion(id), () =>
+        modpackExport.exportInstanceModpack(target, picked.filePath!, {
+          versionId: id,
+          folder: target?.folder,
+          name: opts?.name,
+          version: opts?.version,
+          includeOptions: opts?.includeOptions !== false
+        })
+      )
+    }
+  )
   ipcMain.handle(IPC.modpackOpenFile, async (_e, token: string, fileID: number) => {
     const file = pendingModpackFiles(String(token)).find(f => f.fileID === fileID)
     if (!file) throw new Error('该文件已补充或任务已结束')

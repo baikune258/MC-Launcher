@@ -945,6 +945,7 @@ export const IPC = {
   modpackProbe: 'modpack:probe', // (filePath: string) => ModpackInfo  只解析不安装（供导入确认弹窗）
   modpackSupplyFiles: 'modpack:supplyFiles',
   modpackOpenFile: 'modpack:openFile',
+  modpackExport: 'modpack:export', // (target, opts) => 导出 .mrpack（弹保存对话框；取消返回 null）
   modpackInstall: 'modpack:install', // (filePath: string, opts?: { nameSource?: 'file' | 'inner' }) => void  nameSource 默认 'file'（以压缩包文件名命名实例）；异步：进度走 event:progress，完成走 event:installDone（versionId = 实例 id）
 
   // 世界存档拖拽导入

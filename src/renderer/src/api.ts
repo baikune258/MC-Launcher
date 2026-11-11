@@ -427,6 +427,25 @@ export const resumeTask = (taskId: string) => invoke<boolean>(IPC.tasksResume, t
 export const exportLaunchLogs = (versionId: string, folder?: string) =>
   invoke<string | null>(IPC.launchExportLogs, versionId, folder)
 
+/** 把实例导出为 .mrpack 整合包；返回导出摘要，用户取消保存返回 null */
+export const exportModpack = (target: {
+  id: string
+  folder: string
+  mcVersion?: string
+  loader?: string
+  loaderVersion?: string
+  modpackName?: string
+  modpackVersion?: string
+}, opts?: { name?: string; version?: string; includeOptions?: boolean }) =>
+  invoke<{
+    path: string
+    name: string
+    version: string
+    linked: number
+    bundled: number
+    bytes: number
+  } | null>(IPC.modpackExport, target, opts)
+
 // ---------------- 工具 ----------------
 /** 把 invoke 抛出的错误转成适合 toast 展示的短文本 */
 export function errText(e: unknown): string {
