@@ -828,6 +828,23 @@ async function onRemovePlugin(p: PluginInfo) {
         </label>
       </div>
 
+      <div data-ui="SettingsView:netcafe0001" v-show="category === 'directories'" data-section="netcafe" class="card group group-inline">
+        <div data-ui="SettingsView:netcafe0002">
+          <h3 data-ui="SettingsView:netcafe0003" class="group-title">网吧 / 公共电脑模式</h3>
+          <p data-ui="SettingsView:netcafe0004" class="muted group-hint">
+            关闭装饰动画与自动轮播、停止后台自动下载更新，减少共用机器的卡顿和后台流量；所有数据仍保存在启动器所在文件夹，换机可直接带走。
+          </p>
+        </div>
+        <label data-ui="SettingsView:netcafe0005" class="switch">
+          <input data-ui="SettingsView:netcafe0006"
+            type="checkbox"
+            :checked="store.settings.netCafeMode === true"
+            @change="save({ netCafeMode: ($event.target as HTMLInputElement).checked })"
+          />
+          <span data-ui="SettingsView:netcafe0007" class="switch-ui"></span>
+        </label>
+      </div>
+
       <div data-ui="SettingsView:49e12a3919db" v-show="category === 'game'" class="runtime-grid">
       <!-- 内存 -->
       <details data-ui="SettingsView:af57e3969b2b" class="card group collapse setting-target" data-section="memory" tabindex="-1" open>

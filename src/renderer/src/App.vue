@@ -219,7 +219,7 @@ const inResourceGroup = computed(() =>
 // Route timings also respect the OS preference when Vue uses explicit timeout fallback.
 const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
 const systemMotion = ref(motionQuery.matches)
-const reducedMotion = computed(() => systemMotion.value || store.settings?.reduceMotion === true)
+const reducedMotion = computed(() => systemMotion.value || store.settings?.reduceMotion === true || store.settings?.netCafeMode === true)
 watch(reducedMotion, value => { document.documentElement.dataset.motion = value ? 'reduced' : 'full' }, { immediate: true })
 document.addEventListener('visibilitychange', () => { document.documentElement.dataset.visibility = document.hidden ? 'hidden' : 'visible' })
 const onMotionChange = () => { systemMotion.value = motionQuery.matches }

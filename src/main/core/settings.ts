@@ -60,6 +60,7 @@ function defaults(): Settings {
     ...DEFAULT_DOWNLOAD_LIMITS,
     defaultIsolation: true,
     reduceMotion: false,
+    netCafeMode: false,
     uiWindowAutoFit: false,
     updateMirrorUrls: [],
     msClientId: "", // 留空=内置默认微软应用（Prism 公开应用），可在设置页替换为自注册应用

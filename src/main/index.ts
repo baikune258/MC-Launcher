@@ -1,4 +1,4 @@
-import { app, BrowserWindow, crashReporter, shell, ipcMain, net, protocol, type BrowserWindowConstructorOptions } from 'electron'
+import { app, BrowserWindow, crashReporter, shell, ipcMain, net, protocol, dialog, type BrowserWindowConstructorOptions } from 'electron'
 import { dirname, join } from 'node:path'
 import { mkdirSync, readdirSync, renameSync, rmSync, existsSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
@@ -28,6 +28,7 @@ import { startMemoryTrim } from './core/memTrim'
 import type { MemoryTrimController } from './core/memTrim'
 import { getRunningGamePids } from './core/launch'
 import { exitHistory, rememberExit } from './core/exitHistory'
+import { resolvePortableEnvironment } from './portableEnv'
 import { configureRuntimeGraphics } from './runtimeGraphics'
 import { resynchronizeWindowsRestore } from './windowRestoreVisibility'
 import { adaptiveWindowOptions, attachUiWindowSizing } from './uiWindowSizing'
@@ -46,7 +47,17 @@ if (PORTABLE_EXE) {
       const legacyData = join(baseDir, 'MC-Launcher-data')
       if (existsSync(legacyData)) { try { renameSync(legacyData, newUserData) } catch (error) { console.warn('[MC-Launcher] 旧数据目录迁移失败', error) } }
     }
-    app.setPath('userData', existsSync(newUserData) ? newUserData : join(baseDir, 'MC-Launcher-data'))
+    // 网吧/公共电脑：还原盘、只读盘或权限受限目录写不进去时，不在原地失败，
+    // 而是按同盘根目录 → 其他固定盘 依次找可写位置，并记录环境用于提示。
+    const preferred = existsSync(newUserData) ? newUserData : join(baseDir, 'MC-Launcher-data')
+    const env = resolvePortableEnvironment(baseDir, preferred)
+    app.setPath('userData', env.dataDir)
+    launcherLogInfo('main', `数据目录 ${env.dataDir}（可写=${env.writable}，系统盘=${env.systemDrive}，已迁移=${env.relocated}）`)
+    if (!env.writable) {
+      dialog.showErrorBox('MC-Launcher 无法写入数据目录', `当前目录（${baseDir}）不可写，也没有找到其他可写磁盘。\n请把启动器放到 D 盘或 E 盘后再运行；网吧还原盘的 C 盘无法保存设置。`)
+    } else if (env.systemDrive) {
+      launcherLogWarn('main', '启动器位于系统盘，网吧还原环境重启后设置可能丢失，建议放到 D/E 盘')
+    }
   } catch (error) { console.warn('[MC-Launcher] userData 重定向失败', error) }
   // 旧版运行时目录（KAMUCL-runtime 与上一代 MC-Launcher-runtime）：
   // 新版本解压到 MC-Launcher\runtime 后，旧的缓存目录已无进程占用，启动时清理掉，
@@ -354,7 +365,7 @@ app.whenReady().then(async () => {
           release: result.release,
           skipVersion: s.skipUpdateVersion,
           current: app.getVersion(),
-          autoUpdate: s.autoUpdate !== false,
+          autoUpdate: s.autoUpdate !== false && s.netCafeMode !== true,
           supported: applyMod.updateSupported(),
           downloading: applyMod.isUpdateDownloading(),
           pendingVersion: pending?.release.version ?? blockedUpdateVersion()
@@ -424,6 +435,14 @@ app.on('before-quit', () => {
   void flushLauncherLog()
 })
 app.on('quit', (_event, exitCode) => {
+  // 网吧/公共电脑模式：退出时清掉本机渲染缓存，减少共用机器的磁盘与隐私残留。
+  try {
+    if (getSettings().netCafeMode === true) {
+      for (const dir of ['Cache', 'GPUCache', 'Code Cache', 'Crashpad']) {
+        rmSync(join(app.getPath('userData'), dir), { recursive: true, force: true })
+      }
+    }
+  } catch { /* 清理失败不影响退出 */ }
   if (launcherExitRecord) rememberExit(() => exitHistory().end(launcherExitRecord, exitCode ?? Number(process.exitCode ?? 0)))
   try {
     launcherLogInfo('main', `应用退出，退出码 ${exitCode ?? process.exitCode ?? 0}`)

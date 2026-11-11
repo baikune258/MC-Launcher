@@ -24,6 +24,7 @@ export const settingsCatalog = [
   { id: 'motion', category: 'appearance', name: '减少动态效果', keywords: '动画 动效 系统偏好 晕动 静止' },
   { id: 'ui-window-fit', category: 'appearance', name: 'UI 窗口自适应', keywords: '窗口 自适应 分辨率 缩放 小屏幕 1366 768 DPI 多屏' },
   { id: 'isolation', category: 'directories', name: '新版本默认隔离', keywords: '存档 模组 配置 独立 共享目录' },
+  { id: 'netcafe', category: 'directories', name: '网吧 / 公共电脑模式', keywords: '网吧 还原 无盘 公共电脑 低配 卡顿 共用 清理 便携 U盘' },
   { id: 'memory', category: 'game', name: '内存分配', keywords: 'RAM 自动分配 GB 性能' },
   { id: 'java', category: 'game', name: 'Java 运行时', keywords: 'JDK JVM 路径 自动下载 检测 扫描 手动添加' },
   { id: 'resolution', category: 'display', name: '游戏窗口分辨率', keywords: '宽 高 最大化 全屏 窗口化 退出游戏 自动保存 窗口大小 记住' },
