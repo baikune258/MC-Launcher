@@ -61,7 +61,13 @@ export function parseMcmodSearch(html: string, keyword: string): Candidate[] {
   // Limit parsing to the result list. Navigation, article bodies and unrelated
   // "recommended" entries cannot contribute project identities.
   const list = html.match(/<div\b[^>]*class=["'][^"']*\bsearch-result-list\b[^"']*["'][^>]*>([\s\S]*?)(?=<div\b[^>]*class=["'][^"']*search-result-pages|<footer\b|$)/i)?.[1]
-  if (list == null) throw new Error('MC百科搜索页面格式变化或访问受限')
+  // "没有找到与…有关的内容" is a normal empty result, not an outage. Treating
+  // it as a failure made Chinese searches warn that the encyclopedia was
+  // unavailable even though the site had answered.
+  if (list == null) {
+    if (/没有找到与/.test(html) || /全部\s*\(\s*0\s*\)/.test(html)) return []
+    throw new Error('MC百科搜索页面格式变化或访问受限')
+  }
   const key = normalizeChineseModKeyword(keyword)
   const found: Candidate[] = []
   for (const item of list.split(/<div\b[^>]*class=["']result-item["'][^>]*>/i).slice(1)) {
@@ -137,7 +143,7 @@ async function readHtmlWithSlot(url: string, fetcher: typeof fetch, signal: Abor
  * requests at a time, a shared 10-second deadline, 64 successful cache entries. */
 export async function lookupMcmod(keyword: string, fetcher: typeof fetch = desktopHtmlFetch): Promise<McmodSearchResult> {
   const key = normalizeChineseModKeyword(keyword)
-  if (!/[一-鿿]/.test(key) || key.length < 2 || key.length > 80) return { entries: [], warnings: [] }
+  if (!/[一-鿿]/.test(key) || key.length < 1 || key.length > 80) return { entries: [], warnings: [] }
   if (fetcher === desktopHtmlFetch) {
     const stored = cache.get(key)
     if (stored && Date.now() - stored.at < 6 * 60 * 60_000) return structuredClone(stored.result)
@@ -145,33 +151,55 @@ export async function lookupMcmod(keyword: string, fetcher: typeof fetch = deskt
     if (pending.size >= 16) return { entries: [], warnings: ['MC百科查询较多，已保留原中文关键词和内置别名；请稍后重试。'] }
   }
   const run = async (): Promise<McmodSearchResult> => {
+    // 百科条目名和社区叫法常不一样（「鸢尾光影」在百科里写作「鸢尾花」，
+    // 「机械动力」的附属又都带同一前缀），所以按「完整名 → 去掉词尾 → 取前两字」
+    // 依次检索，避免一次完全匹配失败就判定为没有结果。
+    const base = keyword.trim().replace(/\s*(?:模组|模組|mod)$/i, '')
+    const stripped = base.replace(/(?:光影|光影模组|模组|模組|整合包|插件|前置|附属|扩展)$/u, '').trim()
+    const head = base.length >= 3 ? base.slice(0, 2) : ''
+    const variants = [base, stripped, head].filter((v, i, all) => !!v && all.indexOf(v) === i)
     const signal = AbortSignal.timeout(10_000)
-    const params = new URLSearchParams({ key: keyword.trim().replace(/\s*(?:模组|模組|mod)$/i, ''), filter: '1' })
     try {
-      const html = await readHtml(`https://search.mcmod.cn/s?${params}`, fetcher, signal)
-      let candidates = parseMcmodSearch(html, keyword)
-      const exact = () => candidates.some(item => mcmodNameRank(item.title, key) < 2)
-      let limited = false
-      if (!exact() && /data-page=["']2["']/.test(html)) {
-        params.set('page', '2')
-        const next = await readHtml(`https://search.mcmod.cn/s?${params}`, fetcher, signal)
-        candidates = [...new Map([...candidates, ...parseMcmodSearch(next, keyword)].map(item => [item.id, item])).values()]
-        limited = /data-page=["']3["']/.test(next)
+      let candidates: Candidate[] = [], usedKeyword = base, limited = false, firstPage = ''
+      for (const variant of variants) {
+        const params = new URLSearchParams({ key: variant, filter: '1' })
+        const html = await readHtml(`https://search.mcmod.cn/s?${params}`, fetcher, signal)
+        if (!firstPage) firstPage = html
+        candidates = parseMcmodSearch(html, variant)
+        if (!candidates.length) continue
+        usedKeyword = variant
+        // A short-name search can return parents and add-ons; only accept names
+        // that actually contain what the user typed.
+        const baseKey = normalizeChineseModKeyword(base)
+        candidates = candidates.filter(item => normalizeChineseModKeyword(item.title).includes(baseKey) || mcmodNameRank(item.title, variant) < 2 || normalizeChineseModKeyword(item.title).startsWith(normalizeChineseModKeyword(variant)))
+        const exact = () => candidates.some(item => mcmodNameRank(item.title, variant) < 2)
+        if (!exact() && /data-page=["']2["']/.test(html)) {
+          params.set('page', '2')
+          const next = await readHtml(`https://search.mcmod.cn/s?${params}`, fetcher, signal)
+          candidates = [...new Map([...candidates, ...parseMcmodSearch(next, variant)].map(item => [item.id, item])).values()]
+          limited = /data-page=["']3["']/.test(next)
+        }
+        if (candidates.length) break
       }
-      const matched = candidates.filter(item => mcmodNameRank(item.title, key) < 2)
+      if (!candidates.length) return { entries: [], warnings: [] }
+      const rankKey = normalizeChineseModKeyword(usedKeyword)
+      const matched = candidates.filter(item => mcmodNameRank(item.title, usedKeyword) < 2)
       if (matched.length) candidates = matched
       limited ||= candidates.length > MAX_ENTRIES
       candidates = candidates.slice(0, MAX_ENTRIES)
       const entries: McmodEntry[] = [], warnings: string[] = []
+      // Raising this signal after the search phase kept entry pages from being
+      // cut off by the search deadline; a slow entry only loses its own link.
+      const detailSignal = AbortSignal.timeout(10_000)
       let cursor = 0
       await Promise.all(Array.from({ length: Math.min(2, candidates.length) }, async () => {
         while (cursor < candidates.length) {
           const index = cursor++, candidate = candidates[index]
           try {
-            const page = await readHtml(candidate.url, fetcher, signal), title = parseMcmodEntryTitle(page)
+            const page = await readHtml(candidate.url, fetcher, detailSignal), title = parseMcmodEntryTitle(page)
             // A changed entry title must still match the requested name. Never
             // link a stale search result to an unrelated, renamed entry page.
-            if (title && (!Number.isFinite(mcmodNameRank(title, key)) || (mcmodNameRank(candidate.title, key) < 2 && mcmodNameRank(title, key) >= 2))) {
+            if (title && !Number.isFinite(mcmodNameRank(title, usedKeyword)) && !normalizeChineseModKeyword(title).includes(normalizeChineseModKeyword(usedKeyword))) {
               warnings.push(`MC百科“${candidate.title}”的条目名称已变化，未关联其他同名项目；请核对完整名称。`)
               continue
             }
@@ -189,7 +217,26 @@ export async function lookupMcmod(keyword: string, fetcher: typeof fetch = deskt
         cache.set(key, { at: Date.now(), result: structuredClone(result) })
       }
       return result
-    } catch { return { entries: [], warnings: ['MC百科中文检索暂不可用，已保留原中文关键词和内置别名检索；可稍后重试。'] } }
+    } catch (error) {
+      // One transient block must not turn into a scary 「百科不可用」 warning that
+      // survives the whole session; retry once before reporting.
+      await new Promise(resolve => setTimeout(resolve, 1_000)).catch(() => {})
+      const result: McmodSearchResult = { entries: [], warnings: [] }
+      try {
+        const params = new URLSearchParams({ key: base, filter: '1' })
+        const html = await readHtml(`https://search.mcmod.cn/s?${params}`, fetcher, AbortSignal.timeout(10_000))
+        const entries: McmodEntry[] = []
+        for (const candidate of parseMcmodSearch(html, base).slice(0, MAX_ENTRIES)) {
+          try {
+            const page = await readHtml(candidate.url, fetcher, AbortSignal.timeout(10_000))
+            entries.push({ ...candidate, projects: parseMcmodProjects(page) })
+          } catch { entries.push({ ...candidate, projects: [] }) }
+        }
+        if (entries.length) return { entries, warnings: result.warnings }
+        if (html && /没有找到与/.test(html)) return result
+      } catch {}
+      return { entries: [], warnings: ['MC百科中文检索暂不可用，已保留原中文关键词和内置别名检索；可稍后重试。'] }
+    }
   }
   const promise = run()
   if (fetcher === desktopHtmlFetch) pending.set(key, promise)
