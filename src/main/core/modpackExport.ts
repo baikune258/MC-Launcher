@@ -293,7 +293,7 @@ export async function exportInstanceModpack(
       `- 加载器：${loaderText || '原版（未安装加载器）'}`,
       `- 导出时间：${new Date().toLocaleString('zh-CN')}`,
       `- 文件总数：${files.length}（合计 ${fmtSize(files.reduce((sum, file) => sum + file.size, 0))}）`,
-      '- 说明：这是实例内容的文字清单，供 AI 阅读与分析；完整文件请用「通用 ZIP」导出。'
+      '- 说明：这是实例内容的文字清单，供 AI 阅读与分析；完整文件请用「通用整合包（ZIP）」导出。'
     ]
     for (const [top, group] of [...byTop.entries()].sort()) {
       lines.push('', `## ${dirTitle[top] ?? top}（${group.length} 个文件）`, '')
@@ -328,7 +328,8 @@ export async function exportInstanceModpack(
   }
 
   if (format === 'zip') {
-    // 通用 ZIP：mods/ 与 config/ 直接放在压缩包根，任何启动器、解压软件和 AI 都能直接看目录。
+    // 通用整合包：CurseForge 目录规范（根 manifest.json + overrides/），HMCL、PCL2、Prism、
+    // CurseForge App 都能直接识别导入；同时根目录附一份中文说明，手动解压也看得懂。
     const listing = files
       .map((file) => `${file.rel}\t${file.size}`)
       .sort()
@@ -341,25 +342,47 @@ export async function exportInstanceModpack(
       `导出时间：${new Date().toLocaleString('zh-CN')}`,
       `文件数：${files.length}`,
       '',
-      '压缩包根目录就是游戏目录：mods/ 为模组，config/ 为配置，resourcepacks/ 为资源包，shaderpacks/ 为光影。',
-      '不包含存档、截图、日志与游戏本体，导入后需要自行安装对应版本与加载器。',
+      '包内结构（CurseForge 标准）：manifest.json 描述版本与加载器，overrides/ 里就是游戏目录',
+      '（mods/ 为模组，config/ 为配置，resourcepacks/ 为资源包，shaderpacks/ 为光影）。',
+      '不包含存档、截图、日志与游戏本体，导入后启动器会自动装对应版本与加载器。',
       '',
       '文件清单（相对路径 / 字节）：',
       listing
     ].join('\n')
+    // CurseForge manifest：模组全部随 overrides 携带，files 留空即可
+    const loaderId = deps.minecraft
+      ? Object.entries(deps)
+          .filter(([key]) => key !== 'minecraft')
+          .map(([key, value]) => `${key === 'fabric-loader' ? 'fabric' : key === 'quilt-loader' ? 'quilt' : key}-${value}`)
+          .slice(0, 1)
+      : []
     const manifest = {
+      minecraft: {
+        version: deps.minecraft || '',
+        modLoaders: loaderId.map((id) => ({ id, primary: true }))
+      },
+      manifestType: 'minecraftModpack',
+      manifestVersion: 1,
+      name,
+      version,
+      author: 'KAMUCL',
+      files: [],
+      overrides: 'overrides'
+    }
+    const info = {
       format: 'kamucl-zip-pack',
       name,
       version,
       minecraft: deps.minecraft || '',
-      loader: deps.minecraft && loaderText ? loaderText : '',
+      loader: loaderText || '',
       exportedAt: new Date().toISOString(),
       files
     }
     await writeZip(outputPath, [
+      { kind: 'buffer', name: 'manifest.json', data: Buffer.from(JSON.stringify(manifest, null, 2), 'utf8') },
       { kind: 'buffer', name: '整合包信息.txt', data: Buffer.from(readme, 'utf8') },
-      { kind: 'buffer', name: 'kamucl-pack.json', data: Buffer.from(JSON.stringify(manifest, null, 2), 'utf8') },
-      ...files.map((file) => ({ kind: 'file' as const, name: file.rel, abs: file.abs }))
+      { kind: 'buffer', name: 'kamucl-pack.json', data: Buffer.from(JSON.stringify(info, null, 2), 'utf8') },
+      ...files.map((file) => ({ kind: 'file' as const, name: `overrides/${file.rel}`, abs: file.abs }))
     ])
     const bytes = fs.statSync(outputPath).size
     exportLog.info(`已导出通用整合包 ${path.basename(outputPath)}（${name} ${version}）：${files.length} 个文件，${bytes} 字节`)
