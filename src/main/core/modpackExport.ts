@@ -49,13 +49,13 @@ export interface ModpackExportRequest {
   version?: string
   /** 额外把 options.txt 带上（键位/视频设置等作者预设） */
   includeOptions?: boolean
-  /** zip = 通用压缩包（游戏目录直压，任何解压软件/AI 都能读）；mrpack = Modrinth 标准包 */
-  format?: 'zip' | 'mrpack'
+  /** zip = 通用压缩包；mrpack = Modrinth 标准包；list = 纯文本清单（几 KB，可直接发给 AI） */
+  format?: 'zip' | 'mrpack' | 'list'
 }
 
 export interface ModpackExportResult {
   path: string
-  format: 'zip' | 'mrpack'
+  format: 'zip' | 'mrpack' | 'list'
   name: string
   version: string
   /** 交给启动器在线下载的模组数 */
@@ -185,6 +185,13 @@ function packDependencies(
 }
 
 
+/** 原子写文本文件：先写临时文件再改名，避免半截清单 */
+async function writeAtomicText(outputPath: string, text: string): Promise<void> {
+  const temporary = `${outputPath}.${crypto.randomUUID()}.tmp`
+  await fs.promises.writeFile(temporary, text, 'utf8')
+  await fs.promises.rename(temporary, outputPath)
+}
+
 type ZipEntry = { kind: 'file'; name: string; abs: string } | { kind: 'buffer'; name: string; data: Buffer }
 
 /** 原子写 ZIP：先写临时文件再改名，避免中途失败留下半截包 */
@@ -249,12 +256,76 @@ export async function exportInstanceModpack(
   }
   if (!files.length) throw new Error('这个实例里没有可打包的模组或配置，请先安装模组再导出')
 
-  const format: 'zip' | 'mrpack' = opts.format === 'mrpack' ? 'mrpack' : 'zip'
+  const format: 'zip' | 'mrpack' | 'list' =
+    opts.format === 'mrpack' ? 'mrpack' : opts.format === 'list' ? 'list' : 'zip'
   const deps = packDependencies(target, json)
   const loaderText = Object.entries(deps)
     .filter(([key]) => key !== 'minecraft')
     .map(([key, value]) => `${key} ${value}`)
     .join('、')
+
+  if (format === 'list') {
+    // 纯文本清单：几 KB，AI 与手机都能直接打开，用来让 AI 分析整合包里装了什么。
+    const byTop = new Map<string, typeof files>()
+    for (const file of files) {
+      const top = file.rel.split('/')[0]
+      const list = byTop.get(top)
+      if (list) list.push(file)
+      else byTop.set(top, [file])
+    }
+    const fmtSize = (bytes: number): string => (bytes >= 1024 ** 2 ? `${(bytes / 1024 ** 2).toFixed(2)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`)
+    const dirTitle: Record<string, string> = {
+      mods: '模组（mods）',
+      config: '配置（config）',
+      defaultconfigs: '默认配置（defaultconfigs）',
+      kubejs: 'KubeJS 脚本',
+      resourcepacks: '资源包',
+      shaderpacks: '光影包',
+      datapacks: '数据包',
+      custom: '其他自定义目录',
+      packmenu: '主菜单定制'
+    }
+    const lines: string[] = [
+      `# 整合包清单：${name}`,
+      '',
+      `- 整合包版本：${version}`,
+      `- Minecraft：${deps.minecraft || '未知'}`,
+      `- 加载器：${loaderText || '原版（未安装加载器）'}`,
+      `- 导出时间：${new Date().toLocaleString('zh-CN')}`,
+      `- 文件总数：${files.length}（合计 ${fmtSize(files.reduce((sum, file) => sum + file.size, 0))}）`,
+      '- 说明：这是实例内容的文字清单，供 AI 阅读与分析；完整文件请用「通用 ZIP」导出。'
+    ]
+    for (const [top, group] of [...byTop.entries()].sort()) {
+      lines.push('', `## ${dirTitle[top] ?? top}（${group.length} 个文件）`, '')
+      if (top === 'mods') {
+        lines.push('| 文件名 | 大小 |', '| --- | --- |')
+        for (const file of group.sort((a, b) => a.rel.localeCompare(b.rel))) {
+          lines.push(`| ${file.rel.slice('mods/'.length)} | ${fmtSize(file.size)} |`)
+        }
+        continue
+      }
+      const subDirs = new Map<string, number>()
+      for (const file of group) {
+        const rest = file.rel.split('/').slice(1)
+        const key = rest.length > 1 ? rest[0] : '（根目录文件）'
+        subDirs.set(key, (subDirs.get(key) ?? 0) + 1)
+      }
+      for (const [dir, count] of [...subDirs.entries()].sort()) lines.push(`- ${dir}：${count} 个文件`)
+      const leaves = group.filter((file) => file.rel.split('/').length === 2)
+      if (leaves.length) {
+        // config 根目录下的文件名对排查很关键（能看出装了哪些模组的配置），列上限 300 条
+        const limit = top === 'config' ? 300 : 200
+        lines.push('', '根目录文件：')
+        for (const file of leaves.slice(0, limit)) lines.push(`- ${file.rel}（${fmtSize(file.size)}）`)
+        if (leaves.length > limit) lines.push(`- ……另有 ${leaves.length - limit} 个文件未列出`)
+      }
+    }
+    const text = `${lines.join('\n')}\n`
+    await writeAtomicText(outputPath, text)
+    const bytes = fs.statSync(outputPath).size
+    exportLog.info(`已导出整合包清单 ${path.basename(outputPath)}（${name} ${version}）：${files.length} 个文件，${bytes} 字节`)
+    return { path: outputPath, format, name, version, linked: 0, bundled: files.length, bytes }
+  }
 
   if (format === 'zip') {
     // 通用 ZIP：mods/ 与 config/ 直接放在压缩包根，任何启动器、解压软件和 AI 都能直接看目录。
