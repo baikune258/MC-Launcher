@@ -1270,7 +1270,8 @@ onMounted(async () => {
       if (r.ok) {
         store.failedInstalls.delete(r.versionId)
         if (wasPackInstall) {
-          toast('整合包安装完成', 'success')
+          if (r.warnings?.length) toast('整合包安装完成，但部分文件源站已下架：' + r.warnings.join('；'), 'error')
+          else toast('整合包安装完成', 'success')
           void refreshInstalled()
         } else {
           const favorites = r.favoriteModsResult

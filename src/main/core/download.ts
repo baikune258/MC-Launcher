@@ -583,7 +583,7 @@ export async function downloadFile(url: string, dest: string, progress?: Progres
     }
   })
 }
-export async function downloadAll(tasks: DownloadTask[], progress?: AllProgressFn, concurrency = downloadLimiter.maxConcurrent, mirror: MirrorPref = 'official', signal?: AbortSignal): Promise<void> {
+export async function downloadAll(tasks: DownloadTask[], progress?: AllProgressFn, concurrency = downloadLimiter.maxConcurrent, mirror: MirrorPref = 'official', signal?: AbortSignal, onFailure?: (task: DownloadTask, error: unknown) => boolean | Promise<boolean>): Promise<void> {
   const tracker = new DownloadProgressTracker(), speed = new SmoothedSpeedEstimator(), active = new Map<number,string>()
   const waits = new Map<DownloadWaitState, number>()
   const sourcePool = new DownloadSourcePool()
@@ -626,6 +626,14 @@ export async function downloadAll(tasks: DownloadTask[], progress?: AllProgressF
         } catch (error) {
           const failure = task.label && !controller.signal.aborted && !signal?.aborted
             ? new Error(`资源文件 ${task.label}：${error instanceof Error ? error.message : String(error)}`, { cause: error }) : error
+          if (onFailure && !controller.signal.aborted && !signal?.aborted) {
+            let tolerated = false
+            try { tolerated = await onFailure(task, failure) } catch { tolerated = false }
+            if (tolerated) {
+              // 该文件确认无法取得（源站已下架等）：跳过它，其他文件继续下载，避免整包安装失败
+              tracker.recordComplete(index, 0); active.delete(index); report(); continue
+            }
+          }
           firstError ??= failure; controller.abort(failure); return
         }
       }

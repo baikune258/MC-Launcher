@@ -9,7 +9,8 @@ import { throwIfCancelled, waitIfTaskPaused } from './tasks'
 /** Keep verified immutable downloads outside the instance transaction, so rollback/reimport can reuse them. */
 export async function prepareModpackFiles(
   tasks: DownloadTask[], progress: AllProgressFn, mirror: MirrorPref, signal?: AbortSignal,
-  cacheRoot = path.join(defaultFolderPath(), '.kamucl', 'modpack-cache')
+  cacheRoot = path.join(defaultFolderPath(), '.kamucl', 'modpack-cache'),
+  onFailure?: (task: DownloadTask, error: unknown) => boolean | Promise<boolean>
 ): Promise<{ install: (signal?: AbortSignal) => Promise<void>; dispose: () => Promise<void> }> {
   let temporary = ''
   await fs.promises.mkdir(cacheRoot, { recursive: true })
@@ -23,9 +24,11 @@ export async function prepareModpackFiles(
     return { ...task, label: task.label || path.basename(task.dest), dest, installDest: task.dest }
   }).sort((a, b) => (b.size ?? 0) - (a.size ?? 0))
   try {
-    await downloadAll(cached, progress, downloadLimiter.maxConcurrent, mirror, signal)
+    await downloadAll(cached, progress, downloadLimiter.maxConcurrent, mirror, signal, onFailure)
     return { dispose, install: async (installSignal = signal) => {
       for (const task of cached) {
+        // 已跳过的文件（源站下架且无同字节备份）不会出现在缓存里，跳过安装即可
+        if (!fs.existsSync(task.dest)) continue
         await waitIfTaskPaused(installSignal); throwIfCancelled(installSignal)
         await fs.promises.mkdir(path.dirname(task.installDest), { recursive: true })
         // Copy, never hard-link: edits made by mods must not mutate the shared cache.

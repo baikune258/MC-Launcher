@@ -21,11 +21,11 @@ import type {
   ManualModpackRequest,
   ProgressEvent
 } from '../../shared/types'
-import type { DownloadTask } from './download'
+import { downloadFile, type DownloadTask } from './download'
 import { prepareModpackFiles } from './modpackDownloads'
 import { runParallelTasks } from './parallelTasks'
 import { ParallelProgress } from './parallelProgress'
-import { resolveCurseForgeMetadata, resolveCurseForgeFileUrl, constructCurseForgeCdnUrl, probeCurseForgeCdnUrl, curseForgeInstallDir, exactModrinthDownload } from './curseforgeDownload'
+import { resolveCurseForgeMetadata, resolveCurseForgeFileUrl, constructCurseForgeCdnUrl, probeCurseForgeCdnUrl, curseForgeInstallDir, exactModrinthDownload, curseForgeReplacementFile } from './curseforgeDownload'
 import { BundledModpackFiles } from './modpackBundledFiles'
 import { LocalModpackFiles } from './modpackLocalFiles'
 import { prepareCurseMavenFile } from './modpackAlternateDownload'
@@ -48,6 +48,8 @@ export type ProgressEmit = (e: ProgressEvent) => void
 export interface ModpackInstallOpts extends ModpackInstallRequest {
   /** 任务取消信号（下载中心取消按钮） */
   signal?: AbortSignal
+  /** 安装过程中的非致命提示（源站已下架的文件、自动替换等），用于最后告知用户 */
+  onWarning?: (text: string) => void
 }
 
 // ---------------- 清单结构（只取需要的字段） ----------------
@@ -1541,6 +1543,8 @@ async function installModpackInFolder(filePath: string, emit: ProgressEmit, opts
       },
       async (signal) => {
         parallel.update('pack', { stage: 'modpack', progress: 0, text: '准备整合包文件清单' })
+        let recover: ((task: DownloadTask, error: unknown) => Promise<boolean>) | undefined
+        const packNotes: string[] = []
         if (parsed.kind === 'mrpack' || parsed.kind === 'mmc') {
           // mmc：游戏文件全部在包内，安装阶段整体解压，无需下载
           pending = parsed.files
@@ -1552,6 +1556,9 @@ async function installModpackInFolder(filePath: string, emit: ProgressEmit, opts
           const localFiles = new LocalModpackFiles([...allFolders(), targetFolder])
           const sources = await cfSources()
           let resolved = 0, reused = 0, reusedLocal = 0, alternate = 0
+          interface PackFileIdentity { projectID: number; fileID: number; fileName: string; sha1: string; size: number }
+          const packMeta = new Map<string, PackFileIdentity>()
+          const packNotes: string[] = []
           const infos = await mapPool(
             cfFiles,
             8,
@@ -1583,8 +1590,11 @@ async function installModpackInFolder(filePath: string, emit: ProgressEmit, opts
                 progress: cfFiles.length ? (resolved / cfFiles.length) * 0.04 : 0,
                 text: `校验整合包文件 ${resolved}/${cfFiles.length} · 包内 ${reused} 个 · 本地 ${reusedLocal} 个 · 自动补全 ${alternate} 个`
               })
-              return local ? null : {
-                rel: `${await curseForgeInstallDir(f.projectID, info.fileName, sources, signal)}/${info.fileName}`,
+              if (local) return null
+              const rel = `${await curseForgeInstallDir(f.projectID, info.fileName, sources, signal)}/${info.fileName}`
+              packMeta.set(rel, { projectID: f.projectID, fileID: f.fileID, fileName: info.fileName, sha1: info.sha1, size: info.size })
+              return {
+                rel,
                 url: info.url ?? '', size: info.size, sha1: info.sha1,
                 reuseFiles: existing ? [existing] : undefined
               }
@@ -1592,6 +1602,33 @@ async function installModpackInFolder(filePath: string, emit: ProgressEmit, opts
             signal
           )
           pending = infos.filter((info): info is NonNullable<typeof info> => info !== null)
+          // 文件被作者删除（404/410）时：先找同 SHA1 的 Modrinth 备份，再取同项目最新可用文件，
+          // 都没有就跳过这一个文件继续安装，最后把结果告诉用户，而不是整包失败。
+          recover = async (task: DownloadTask, error: unknown): Promise<boolean> => {
+            const identity = packMeta.get(task.label ?? '')
+            if (!identity) return false
+            const message = error instanceof Error ? error.message : String(error)
+            if (!/HTTP\s+(404|410)\b/i.test(message)) return false
+            const base = { fileName: identity.fileName, sha1: identity.sha1, size: identity.size, url: null, isAvailable: true }
+            const exact = await exactModrinthDownload(base, signal).catch(() => null)
+            if (exact) {
+              try {
+                await downloadFile(exact, task.dest, undefined, identity.sha1, getSettings().mirror, signal)
+                packNotes.push(`「${identity.fileName}」原地址已下架，已从 Modrinth 备份取回同一文件`)
+                return true
+              } catch { /* 继续尝试替代版本 */ }
+            }
+            const replacement = await curseForgeReplacementFile(identity.projectID, sources, meta.mcVersion, meta.loader, signal).catch(() => null)
+            if (replacement) {
+              try {
+                await downloadFile(replacement.url, task.dest, undefined, undefined, getSettings().mirror, signal)
+                packNotes.push(`「${identity.fileName}」已被作者删除，已自动换成同项目最新版 ${replacement.fileName}`)
+                return true
+              } catch { /* 回落到跳过 */ }
+            }
+            packNotes.push(`「${identity.fileName}」在源站已下架且没有可用备份，已跳过（缺少它可能导致部分模组报错）`)
+            return true
+          }
           packLog.info(`CurseForge 清单 ${cfFiles.length} 个文件：复用包内 ${reused} 个、本地 ${reusedLocal} 个，备用源补全 ${alternate} 个，自动下载 ${pending.length - manual.length - reusedLocal - alternate} 个，待补充 ${manual.length} 个`)
         }
 
@@ -1635,7 +1672,7 @@ async function installModpackInFolder(filePath: string, emit: ProgressEmit, opts
           try {
             await runParallelTasks([
               async signal => {
-                pieces.push(await prepareModpackFiles(automatic, downloadProgress, getSettings().mirror, signal))
+                pieces.push(await prepareModpackFiles(automatic, downloadProgress, getSettings().mirror, signal, undefined, recover))
               },
               async signal => {
                 if (!manual.length) return
@@ -1653,6 +1690,10 @@ async function installModpackInFolder(filePath: string, emit: ProgressEmit, opts
           }
         } catch (e) {
           throw new Error(`整合包文件下载失败：${errText(e)}`)
+        }
+        if (packNotes.length) {
+          packLog.warn(packNotes.join('；'))
+          opts?.onWarning?.(packNotes.join('；'))
         }
         parallel.done('pack')
       }

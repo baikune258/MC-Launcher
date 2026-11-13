@@ -583,6 +583,8 @@ export function registerIpc(getWin: () => BrowserWindow | null): void {
       }
       const task = registerTask(`导入整合包 ${path.basename(fp)}`, 'modpack')
       clean.signal = task.controller.signal
+      const warnings: string[] = []
+      clean.onWarning = (text: string) => { if (text) warnings.push(text) }
       const progressGuard = new ProgressEventGuard()
       let lastStage = ''
       const taskEmit = (e: ProgressEvent): void => {
@@ -594,7 +596,7 @@ export function registerIpc(getWin: () => BrowserWindow | null): void {
         .installModpack(fp, taskEmit, clean)
         .then((id) => {
           send(IPC_EVENT.taskDone, { taskId: task.id, ok: true })
-          send(IPC_EVENT.installDone, { versionId: id, ok: true, taskId: task.id })
+          send(IPC_EVENT.installDone, { versionId: id, ok: true, taskId: task.id, warnings: warnings.length ? warnings : undefined })
         })
         .catch((err) => {
           const cancelled = isCancelError(err)

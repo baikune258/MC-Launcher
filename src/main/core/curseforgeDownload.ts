@@ -140,3 +140,38 @@ export async function exactModrinthDownload(file: ResolvedCfFile, signal?: Abort
   }
   return null
 }
+
+/** 文件被作者删除时，取该项目在相同 Minecraft 版本 / 加载器下最新可用的文件作为替代。
+ * 仅用于「原文件已确定 404/410」的兜底，替代文件会以真实 URL 下载并按自身大小校验。 */
+export async function curseForgeReplacementFile(
+  projectID: number, sources: CfMetadataSource[], gameVersion: string, loader: string | undefined, signal?: AbortSignal
+): Promise<{ url: string; fileName: string; sha1: string; size: number; fileID: number } | null> {
+  const loaderType = ({ forge: 1, fabric: 4, quilt: 5, neoforge: 6 } as Record<string, number>)[loader ?? ''] ?? 0
+  for (const source of sources) {
+    signal?.throwIfAborted()
+    try {
+      const timeout = AbortSignal.timeout(7000)
+      const params = new URLSearchParams({ pageSize: '20', index: '0' })
+      if (gameVersion) params.set('gameVersion', gameVersion)
+      if (loaderType) params.set('modLoaderType', String(loaderType))
+      const res = await httpFetch(`${source.base}/mods/${projectID}/files?${params}`, {
+        headers: source.headers, signal: signal ? AbortSignal.any([signal, timeout]) : timeout
+      })
+      if (!res.ok) { await res.body?.cancel(); continue }
+      const { data } = await res.json() as { data?: Array<{ id?: number; fileName?: string; isAvailable?: boolean; downloadUrl?: string | null; fileLength?: number; hashes?: { algo: number; value: string }[] }> }
+      const candidates = (data ?? [])
+        .filter(file => file.isAvailable !== false && Number.isSafeInteger(file.id) && file.id! > 0)
+        .filter(file => typeof file.fileName === 'string' && /\.jar$/i.test(file.fileName))
+        .sort((a, b) => (b.id ?? 0) - (a.id ?? 0))
+      for (const file of candidates) {
+        const name = file.fileName as string
+        if (/[/\\\x00-\x1f]/.test(name)) continue
+        const sha1 = file.hashes?.find(hash => hash.algo === 1)?.value ?? ''
+        if (!Number.isSafeInteger(file.fileLength) || !file.fileLength || !/^[a-f\d]{40}$/i.test(sha1)) continue
+        const url = downloadUrl(file.downloadUrl) ?? constructCurseForgeCdnUrl(file.id!, name)
+        return { url, fileName: name, sha1: sha1.toLowerCase(), size: file.fileLength, fileID: file.id! }
+      }
+    } catch { signal?.throwIfAborted() }
+  }
+  return null
+}

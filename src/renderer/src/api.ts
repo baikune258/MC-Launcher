@@ -402,9 +402,9 @@ export const onLaunchState = (cb: (s: LaunchState) => void) =>
 export const onMsLoginDone = (cb: (result: { account: Account | null; error?: string | null }) => void) =>
   subscribe<{ account: Account | null; error?: string | null }>(IPC_EVENT.msLoginDone, cb)
 export const onInstallDone = (
-  cb: (r: { versionId: string; installedId?: string; ok: boolean; error?: string; taskId?: string; cancelled?: boolean; stage?: string; favoriteModsResult?: import('@shared/modFavorites').FavoriteInstallResult }) => void
+  cb: (r: { versionId: string; installedId?: string; ok: boolean; error?: string; taskId?: string; cancelled?: boolean; stage?: string; warnings?: string[]; favoriteModsResult?: import('@shared/modFavorites').FavoriteInstallResult }) => void
 ) =>
-  subscribe<{ versionId: string; installedId?: string; ok: boolean; error?: string; taskId?: string; cancelled?: boolean; stage?: string; favoriteModsResult?: import('@shared/modFavorites').FavoriteInstallResult }>(
+  subscribe<{ versionId: string; installedId?: string; ok: boolean; error?: string; taskId?: string; cancelled?: boolean; stage?: string; warnings?: string[]; favoriteModsResult?: import('@shared/modFavorites').FavoriteInstallResult }>(
     IPC_EVENT.installDone,
     cb
   )
