@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import AdmZip from 'adm-zip'
 import { verifyFile, downloadFile, type MirrorPref } from './download'
+import { isVerifiedArtifact, rememberVerifiedArtifact, forgetVerifiedArtifact } from './launchVerifyCache'
 
 export interface LaunchArtifact { dest: string; url?: string; urls?: string[]; sha1?: string; size?: number }
 // Only successful checks are reused, within this launcher process. Any changed
@@ -18,6 +19,17 @@ export async function invalidLaunchArtifact(file: LaunchArtifact): Promise<strin
   const key = path.resolve(file.dest), before = await artifactSignature(file)
   const cached = verifiedArtifacts.get(key)
   if (before && cached?.signature === before && cached.expires > Date.now()) return null
+  // 跨启动复用：大小、修改时间、期望 sha1 全部一致时无需重新哈希整个文件
+  if (before) {
+    try {
+      const stat = await fs.promises.stat(file.dest)
+      if (stat.isFile() && isVerifiedArtifact(file.dest, file.sha1, stat.size, stat.mtimeMs)) {
+        if (verifiedArtifacts.size >= 8192) verifiedArtifacts.delete(verifiedArtifacts.keys().next().value!)
+        verifiedArtifacts.set(key, { signature: before, expires: Date.now() + 5 * 60_000 })
+        return null
+      }
+    } catch { /* stat 失败则退回完整校验 */ }
+  }
   verifiedArtifacts.delete(key)
   const reason = await verifyFile(file.dest, file)
   if (reason) return reason
@@ -27,6 +39,10 @@ export async function invalidLaunchArtifact(file: LaunchArtifact): Promise<strin
   if (before && before === await artifactSignature(file)) {
     if (verifiedArtifacts.size >= 8192) verifiedArtifacts.delete(verifiedArtifacts.keys().next().value!)
     verifiedArtifacts.set(key, { signature: before, expires: Date.now() + 5 * 60_000 })
+    try {
+      const stat = await fs.promises.stat(file.dest)
+      if (stat.isFile()) rememberVerifiedArtifact(file.dest, file.sha1, stat.size, stat.mtimeMs)
+    } catch { /* 忽略缓存写入失败 */ }
     return null
   }
   return '文件在完整性校验期间发生变化，请重试'
@@ -57,5 +73,7 @@ export async function ensureLaunchArtifact(file: LaunchArtifact, mirror: MirrorP
     if(before)await fs.promises.rename(file.dest,old)
     try{await fs.promises.copyFile(temporary,file.dest,fs.constants.COPYFILE_EXCL)}catch(e){if(before){try{await fs.promises.rename(old,file.dest)}catch{preserve=true;throw new Error('修复未完成，原文件保留于 '+old)}}throw e}
   }finally{if(!preserve)await fs.promises.rm(stage,{recursive:true,force:true})}
+  // 覆盖写入后旧结论立即作废，本次启动末尾会重新记录
+  forgetVerifiedArtifact(file.dest)
   return true
 }

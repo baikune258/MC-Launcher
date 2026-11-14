@@ -514,18 +514,31 @@ async function launchOwned(
         const zip = new AdmZip(jar)
         for (const entry of zip.getEntries()) if (!entry.isDirectory && /\.so(?:\.\d+)*$/.test(entry.entryName)) assertNativeElf(entry.getData(), process.arch, `${path.basename(jar)}:${entry.entryName}`)
       }
-      for (const jar of natives) {
-        if (!fs.existsSync(jar)) continue
-        try {
-          const zip = new AdmZip(jar)
-          for (const entry of zip.getEntries()) {
-            if (entry.isDirectory || entry.entryName.startsWith('META-INF/')) continue
-            zip.extractEntryTo(entry, nativesPath, true, true)
+      // natives 只需解压一次：用标记文件记录参与解压的 jar 名称/大小/修改时间，
+      // 完全没变化时跳过整轮解压（每次启动可省数秒）。
+      const nativesMarker = path.join(nativesPath, '.kamucl-natives.json')
+      const nativesSignature = natives.filter(jar => fs.existsSync(jar)).map(jar => {
+        try { const stat = fs.statSync(jar); return `${path.basename(jar)}:${stat.size}:${stat.mtimeMs}` } catch { return `${path.basename(jar)}:0` }
+      }).join('|')
+      let nativesReady = false
+      try { nativesReady = fs.readFileSync(nativesMarker, 'utf8') === nativesSignature } catch { /* 首次或标记损坏 */ }
+      if (nativesReady && natives.every(jar => !fs.existsSync(jar) || fs.existsSync(nativesPath))) {
+        launchLog.debug('natives 未变化，跳过重复解压')
+      } else {
+        for (const jar of natives) {
+          if (!fs.existsSync(jar)) continue
+          try {
+            const zip = new AdmZip(jar)
+            for (const entry of zip.getEntries()) {
+              if (entry.isDirectory || entry.entryName.startsWith('META-INF/')) continue
+              zip.extractEntryTo(entry, nativesPath, true, true)
+            }
+          } catch (error) {
+            if (process.platform === 'linux') throw new Error(`Linux 原生运行库解压失败：${path.basename(jar)}；${String(error)}`)
+            // Preserve the existing Windows/macOS extraction behavior.
           }
-        } catch (error) {
-          if (process.platform === 'linux') throw new Error(`Linux 原生运行库解压失败：${path.basename(jar)}；${String(error)}`)
-          // Preserve the existing Windows/macOS extraction behavior.
         }
+        try { fs.writeFileSync(nativesMarker, nativesSignature, 'utf8') } catch { /* 标记写失败只是下次重新解压 */ }
       }
       const classpath = [...new Set([...artifacts, ...natives, clientJar])].join(path.delimiter)
 
