@@ -1608,17 +1608,20 @@ async function installModpackInFolder(filePath: string, emit: ProgressEmit, opts
             const identity = packMeta.get(task.label ?? '')
             if (!identity) return false
             const message = error instanceof Error ? error.message : String(error)
-            if (!/HTTP\s+(404|410)\b/i.test(message)) return false
+            const removed = /HTTP\s+(404|410)\b/i.test(message)
             const base = { fileName: identity.fileName, sha1: identity.sha1, size: identity.size, url: null, isAvailable: true }
             const exact = await exactModrinthDownload(base, signal).catch(() => null)
             if (exact) {
               try {
                 await downloadFile(exact, task.dest, undefined, identity.sha1, getSettings().mirror, signal)
-                packNotes.push(`「${identity.fileName}」原地址已下架，已从 Modrinth 备份取回同一文件`)
+                packNotes.push(`「${identity.fileName}」原地址不可用，已从 Modrinth 备份取回同一文件`)
                 return true
               } catch { /* 继续尝试替代版本 */ }
             }
-            const replacement = await curseForgeReplacementFile(identity.projectID, sources, meta.mcVersion, meta.loader, signal).catch(() => null)
+            // 只有确定「源站已删除」才换版本；网络慢/超时等情况直接跳过该文件，避免无谓改版本
+            const replacement = removed
+              ? await curseForgeReplacementFile(identity.projectID, sources, meta.mcVersion, meta.loader, signal).catch(() => null)
+              : null
             if (replacement) {
               try {
                 await downloadFile(replacement.url, task.dest, undefined, undefined, getSettings().mirror, signal)
@@ -1626,7 +1629,9 @@ async function installModpackInFolder(filePath: string, emit: ProgressEmit, opts
                 return true
               } catch { /* 回落到跳过 */ }
             }
-            packNotes.push(`「${identity.fileName}」在源站已下架且没有可用备份，已跳过（缺少它可能导致部分模组报错）`)
+            packNotes.push(removed
+              ? `「${identity.fileName}」在源站已下架且没有可用备份，已跳过（缺少它可能导致部分模组报错）`
+              : `「${identity.fileName}」多次下载失败（${message.split('\n')[0].slice(0, 60)}），已跳过该文件`)
             return true
           }
           packLog.info(`CurseForge 清单 ${cfFiles.length} 个文件：复用包内 ${reused} 个、本地 ${reusedLocal} 个，备用源补全 ${alternate} 个，自动下载 ${pending.length - manual.length - reusedLocal - alternate} 个，待补充 ${manual.length} 个`)
@@ -1658,9 +1663,11 @@ async function installModpackInFolder(filePath: string, emit: ProgressEmit, opts
               stage: 'modpack',
               progress: 0.04 + ratio * 0.96,
               text:
-                detail.bytesTotal != null
-                  ? `下载整合包文件 ${d}/${t}（${fmtMB(doneBytes)}/${fmtMB(detail.bytesTotal)}）${detail.activeFiles?.length && detail.activeFiles.length <= 2 ? ' · ' + detail.activeFiles.join('、') : ''}`
-                  : `下载整合包文件 ${d}/${t}`,
+                (detail.waits?.length
+                  ? `重试 ${detail.waits[0].file ?? '文件'}（${d}/${t}）`
+                  : detail.bytesTotal != null
+                    ? `下载整合包文件 ${d}/${t}（${fmtMB(doneBytes)}/${fmtMB(detail.bytesTotal)}）${detail.activeFiles?.length && detail.activeFiles.length <= 2 ? ' · ' + detail.activeFiles.join('、') : ''}`
+                    : `下载整合包文件 ${d}/${t}`),
               speed,
               etaSeconds: detail.etaSeconds ?? undefined,
               bytesDone: detail.bytesDone,
@@ -1713,7 +1720,8 @@ async function installModpackInFolder(filePath: string, emit: ProgressEmit, opts
     }
 
     report({ stage: 'modpack', progress: 0.95, text: '写入已校验的整合包文件…' })
-    await prepared!.install(opts?.signal)
+    await prepared!.install(opts?.signal, (done, total, name) =>
+      report({ stage: 'modpack', progress: 0.95 + 0.01 * done / Math.max(1, total), text: `写入整合包文件 ${done}/${total} · ${name}` }))
 
     // 7) 解压 overrides 覆盖到实例目录
     report({ stage: 'modpack', progress: 0.96, text: '解压覆盖文件…' })

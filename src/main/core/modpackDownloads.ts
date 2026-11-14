@@ -11,7 +11,7 @@ export async function prepareModpackFiles(
   tasks: DownloadTask[], progress: AllProgressFn, mirror: MirrorPref, signal?: AbortSignal,
   cacheRoot = path.join(defaultFolderPath(), '.kamucl', 'modpack-cache'),
   onFailure?: (task: DownloadTask, error: unknown) => boolean | Promise<boolean>
-): Promise<{ install: (signal?: AbortSignal) => Promise<void>; dispose: () => Promise<void> }> {
+): Promise<{ install: (signal?: AbortSignal, onProgress?: (done: number, total: number, name: string) => void) => Promise<void>; dispose: () => Promise<void> }> {
   let temporary = ''
   await fs.promises.mkdir(cacheRoot, { recursive: true })
   // Unidentified files belong to this job only; never publish them into the instance before runtime preparation.
@@ -25,7 +25,8 @@ export async function prepareModpackFiles(
   }).sort((a, b) => (b.size ?? 0) - (a.size ?? 0))
   try {
     await downloadAll(cached, progress, downloadLimiter.maxConcurrent, mirror, signal, onFailure)
-    return { dispose, install: async (installSignal = signal) => {
+    return { dispose, install: async (installSignal = signal, onProgress) => {
+      let copied = 0
       for (const task of cached) {
         // 已跳过的文件（源站下架且无同字节备份）不会出现在缓存里，跳过安装即可
         if (!fs.existsSync(task.dest)) continue
@@ -33,6 +34,8 @@ export async function prepareModpackFiles(
         await fs.promises.mkdir(path.dirname(task.installDest), { recursive: true })
         // Copy, never hard-link: edits made by mods must not mutate the shared cache.
         await fs.promises.copyFile(task.dest, task.installDest)
+        copied++
+        onProgress?.(copied, cached.length, path.basename(task.installDest))
       }
     } }
   } catch (error) {
