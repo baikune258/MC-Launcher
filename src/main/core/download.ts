@@ -16,7 +16,7 @@ import { resolveNativeIntegrity } from './platformNatives'
 
 export type MirrorPref = 'official' | 'bmclapi'
 export type ProgressFn = (done: number, total: number, networkBytes?: number) => void
-export interface DownloadWaitState { reason: 'rate-limit'; source: string; retryAt: number; action: 'waiting' | 'switching'; file?: string }
+export interface DownloadWaitState { reason: 'rate-limit' | 'network'; source: string; retryAt: number; action: 'waiting' | 'switching'; file?: string }
 export interface DownloadBatchProgress extends DownloadProgressSnapshot { activeFiles?: string[]; waits?: DownloadWaitState[]; speedBps: number; etaSeconds: number | null; paused: boolean }
 export type AllProgressFn = (done: number, total: number, speedBps: number, detail: DownloadBatchProgress) => void
 export interface DownloadTask { label?: string; url: string; urls?: string[]; dest: string; sha1?: string; sha512?: string; sha256?: string; size?: number; reuseDirs?: string[]; reuseFiles?: string[]; nativeChecksumUrl?: string }
@@ -83,7 +83,7 @@ export class DownloadRateLimitError extends Error {
 }
 export const transferTimeouts = { inactivityMs: 15_000, alternativeHeadersMs: 2500 }
 export const rateLimitTimeouts = { maxWaitMs: 30_000 }
-export const slowSpeedThresholds = { largeFileBytes: 1024*1024, largeWindowMs: 8000, largeMinBps: 256*1024, smallWindowMs: 4000, smallMinBps: 32*1024, windowMs: 15000, minWindowBytes: 16*1024, warmupBytes: 1024*1024, warmupMs: 15000 }
+export const slowSpeedThresholds = { largeFileBytes: 1024*1024, largeWindowMs: 10000, largeMinBps: 128*1024, smallWindowMs: 4000, smallMinBps: 32*1024, windowMs: 15000, minWindowBytes: 16*1024, warmupBytes: 1024*1024, warmupMs: 15000 }
 const failures = new Map<string, { count: number; until: number }>()
 const origin = (url: string) => { try { return new URL(url).origin } catch { return url } }
 const serverCooldowns = new Map<string, number>()
@@ -227,6 +227,17 @@ async function receive(url: string, temporary: string, expected: Integrity, sign
   signal?.addEventListener('abort', abort, { once: true })
   let response: Response | undefined, reader: ReadableStreamDefaultReader<Uint8Array> | undefined, file: fs.promises.FileHandle | undefined
   let timer: ReturnType<typeof setInterval> | undefined, waiting = false, sinceData = 0, elapsed = 0, windowTime = 0, windowBytes = 0, transferred = 0
+  let stallState: DownloadWaitState | undefined
+  const markStall = () => {
+    if (!waitControl?.onWait) return
+    stallState ??= { reason: 'network', source: origin(url), retryAt: Date.now() + 2000, action: canAvoidCooldown(url, waitControl) ? 'switching' : 'waiting' }
+    try { waitControl.onWait(stallState, true) } catch { /* UI 回调不应影响传输 */ }
+  }
+  const clearStall = () => {
+    if (!stallState) return
+    try { waitControl?.onWait?.(stallState, false) } catch { /* 同上 */ }
+    stallState = undefined
+  }
   let last = performance.now()
   let headersMs = 0, bodyMs = 0, remainingBytes = expected.size ?? Infinity
   const slow = slowSpeedThresholds
@@ -251,7 +262,7 @@ async function receive(url: string, temporary: string, expected: Integrity, sign
       const now = performance.now(), dt = now - last; last = now
       if (!waiting || isTaskPaused(signal) || (response && downloadLimiter.isThrottling)) return
       sinceData += dt; elapsed += dt; windowTime += dt
-      if (sinceData >= transferTimeouts.inactivityMs) controller.abort(new NetworkIdle('下载网络停滞'))
+      if (sinceData >= transferTimeouts.inactivityMs) { markStall(); controller.abort(new NetworkIdle('下载网络停滞')) }
       // A queue/paused task consumes no timeout. Only abandon an unresponsive
       // first source early when an exact fallback exists; the last source keeps
       // the full idle allowance, so slower but usable connections can finish.
@@ -265,7 +276,7 @@ async function receive(url: string, temporary: string, expected: Integrity, sign
         // Small mods/assets used to tolerate a few KB/s indefinitely. Switch only
         // when an exact alternate exists and finishing is not already imminent.
         const smallStalled = smallAlternative && rate < slow.smallMinBps && remainingBytes > 0 && remainingBytes / Math.max(1, rate) > slow.smallWindowMs / 1000
-        if ((aggressive && rate < slow.largeMinBps) || smallStalled || (ready && windowBytes < slow.minWindowBytes)) controller.abort(new NetworkIdle('下载速度过慢'))
+        if ((aggressive && rate < slow.largeMinBps) || smallStalled || (ready && windowBytes < slow.minWindowBytes)) { markStall(); controller.abort(new NetworkIdle('下载速度过慢')) }
         windowTime = 0; windowBytes = 0
       }
     }, Math.max(10, Math.min(100, transferTimeouts.inactivityMs / 4)))
@@ -319,6 +330,7 @@ async function receive(url: string, temporary: string, expected: Integrity, sign
       bodyMs += performance.now() - readStart
       waiting = false; sinceData = 0
       if (chunk.done) break
+      clearStall()
       await downloadLimiter.consume(chunk.value.length, signal)
       await waitIfTaskPaused(signal)
       let written = 0
@@ -344,6 +356,7 @@ async function receive(url: string, temporary: string, expected: Integrity, sign
     if (error instanceof Error) Object.assign(error, { downloadUrl: url })
     throw controller.signal.aborted ? controller.signal.reason : error
   } finally {
+    clearStall()
     clearInterval(timer)
     controller.abort()
     if (reader) { await reader.cancel().catch(() => {}); reader.releaseLock() }

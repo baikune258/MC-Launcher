@@ -1664,7 +1664,7 @@ async function installModpackInFolder(filePath: string, emit: ProgressEmit, opts
               progress: 0.04 + ratio * 0.96,
               text:
                 (detail.waits?.length
-                  ? `重试 ${detail.waits[0].file ?? '文件'}（${d}/${t}）`
+                  ? `${detail.waits[0].reason === 'network' ? '连接停滞，正在换源 ' : '重试 '}${detail.waits[0].file ?? '文件'}（${d}/${t}）`
                   : detail.bytesTotal != null
                     ? `下载整合包文件 ${d}/${t}（${fmtMB(doneBytes)}/${fmtMB(detail.bytesTotal)}）${detail.activeFiles?.length && detail.activeFiles.length <= 2 ? ' · ' + detail.activeFiles.join('、') : ''}`
                     : `下载整合包文件 ${d}/${t}`),
