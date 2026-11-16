@@ -348,7 +348,9 @@ function mapCfFiles(files: CfFile[], projectId: string): CommunityFile[] {
 async function withZhTitle(list: CommunityResult[]): Promise<CommunityResult[]> {
   const original = list.map((r) => r.originalTitle ?? r.title)
   const mapped = list.map((r, i) => {
-    const zh = MOD_ZH[r.slug]
+    // 先按来源 slug 命中内置表；slug 与内置键不一致时（CurseForge 与 Modrinth
+    // 命名差异），再按英文名的 slug 化形式兜底。
+    const zh = MOD_ZH[r.slug] ?? MOD_ZH[original[i].toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')]
     return zh && !original[i].startsWith(zh) ? zh : undefined
   })
   const resolved = await enrichChineseNames(original.map((title, i) => ({ title, zh: mapped[i] })), 2_400)

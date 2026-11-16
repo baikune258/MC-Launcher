@@ -276,25 +276,27 @@ export async function lookupChineseNameByEnglish(english: string, fetcher: typeo
   const key = englishKey(english)
   if (key.length < 2 || key.length > 60) return null
   const stored = zhNameCache.get(key)
-  if (stored && Date.now() - stored.at < 7 * 24 * 60 * 60_000) return stored.hit
+  if (stored && Date.now() - stored.at < (stored.hit ? 7 * 24 * 60 * 60_000 : 15 * 60_000)) return stored.hit
   if (fetcher === desktopHtmlFetch) {
     const pendingHit = zhNamePending.get(key)
     if (pendingHit) return pendingHit
     if (zhNamePending.size >= 12) return null
   }
   const run = async (): Promise<ModZhNameHit | null> => {
-    const signal = AbortSignal.timeout(9_000)
+    const signal = AbortSignal.timeout(12_000)
     try {
       const params = new URLSearchParams({ key: english.trim() })
       const html = await readHtml(`https://search.mcmod.cn/s?${params}`, fetcher, signal)
       const candidates = parseEnglishAliasTitles(html)
-      // 优先完全同名；其次允许百科英文是「输入名 + 空格后缀」（如 Sodium Extra）但绝不反向包含
-      let best: ModZhNameHit | null = null, bestRank = Infinity
-      for (const candidate of candidates) {
-        const candidateKey = englishKey(candidate.en), inputKey = key
-        const rank = candidateKey === inputKey ? 0 : candidateKey.startsWith(inputKey) && candidateKey.length >= inputKey.length && candidateKey.length <= inputKey.length + 12 ? 1 : Infinity
-        if (rank < bestRank) { best = candidate; bestRank = rank }
-      }
+      // 只接受三种可靠对应：括号内英文完全同名；输入是英文全名的首字母缩写
+      // （JEI = Just Enough Items）。
+      // 形近名（Sodium Extra / IrisFixes）一律不认，宁可暂时没中文名也不能张冠李戴。
+      const initials = (value: string) => value.split(/[^A-Za-z0-9]+/).filter(Boolean).map(w => w[0]).join('').toLowerCase()
+      // 只接受完全同名或首字母缩写（JEI = Just Enough Items）。任何形近名
+      // （IrisFixes / Jade Feet）都不认：宁可暂时没有中文名，也不能张冠李戴。
+      const best = candidates.find(candidate => englishKey(candidate.en) === key)
+        ?? candidates.find(candidate => key.length >= 3 && initials(candidate.en) === key)
+        ?? null
       if (fetcher === desktopHtmlFetch) {
         if (zhNameCache.size >= 4000) zhNameCache.delete(zhNameCache.keys().next().value!)
         zhNameCache.set(key, { at: Date.now(), hit: best })
