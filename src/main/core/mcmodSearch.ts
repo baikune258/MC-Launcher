@@ -242,3 +242,70 @@ export async function lookupMcmod(keyword: string, fetcher: typeof fetch = deskt
   if (fetcher === desktopHtmlFetch) pending.set(key, promise)
   try { return await promise } finally { if (fetcher === desktopHtmlFetch) pending.delete(key) }
 }
+
+// ---------------- 英文名 → 百科中文名 ----------------
+// 百科搜索结果标题形如「钠 ( Sodium )」，括号内是英文名。只把括号内英文与
+// 输入英文完全对应（归一化后相等）的条目当作同名，避免把「钠·扩展」当成「Sodium」。
+export interface ModZhNameHit { zh: string; en: string; id: string; url: string }
+const zhNameCache = new Map<string, { at: number; hit: ModZhNameHit | null }>()
+const zhNamePending = new Map<string, Promise<ModZhNameHit | null>>()
+const englishKey = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '')
+
+export function parseEnglishAliasTitles(html: string): ModZhNameHit[] {
+  const list = html.match(/<div\b[^>]*class=["'][^"']*\bsearch-result-list\b[^"']*["'][^>]*>([\s\S]*?)(?=<div\b[^>]*class=["'][^"']*search-result-pages|<footer\b|$)/i)?.[1]
+  if (list == null) return []
+  const found: ModZhNameHit[] = []
+  for (const item of list.split(/<div\b[^>]*class=["']result-item["'][^>]*>/i).slice(1)) {
+    const head = item.split(/<div\b[^>]*class=["']body["']/i)[0]
+    for (const anchor of anchors(head)) {
+      const id = (() => { try { return new URL(anchor.href, 'https://www.mcmod.cn').pathname.match(/^\/class\/(\d+)\.html$/)?.[1] } catch { return undefined } })()
+      if (!id) continue
+      // 「中文名 ( English Name )」→ 中文名 + 英文名
+      const match = /\s*([^()]{1,60}?)\s*\(\s*([A-Za-z0-9][A-Za-z0-9 ._\-:'&!?]*)\s*\)\s*/.exec(anchor.title)
+      if (!match) continue
+      const zh = match[1].replace(/^\[[^\]]+\]\s*/, '').trim()
+      const en = match[2].trim()
+      if (!/[一-鿿]/.test(zh)) continue
+      found.push({ zh, en, id, url: `https://www.mcmod.cn/class/${id}.html` })
+    }
+  }
+  return found
+}
+
+export async function lookupChineseNameByEnglish(english: string, fetcher: typeof fetch = desktopHtmlFetch): Promise<ModZhNameHit | null> {
+  const key = englishKey(english)
+  if (key.length < 2 || key.length > 60) return null
+  const stored = zhNameCache.get(key)
+  if (stored && Date.now() - stored.at < 7 * 24 * 60 * 60_000) return stored.hit
+  if (fetcher === desktopHtmlFetch) {
+    const pendingHit = zhNamePending.get(key)
+    if (pendingHit) return pendingHit
+    if (zhNamePending.size >= 12) return null
+  }
+  const run = async (): Promise<ModZhNameHit | null> => {
+    const signal = AbortSignal.timeout(9_000)
+    try {
+      const params = new URLSearchParams({ key: english.trim() })
+      const html = await readHtml(`https://search.mcmod.cn/s?${params}`, fetcher, signal)
+      const candidates = parseEnglishAliasTitles(html)
+      // 优先完全同名；其次允许百科英文是「输入名 + 空格后缀」（如 Sodium Extra）但绝不反向包含
+      let best: ModZhNameHit | null = null, bestRank = Infinity
+      for (const candidate of candidates) {
+        const candidateKey = englishKey(candidate.en), inputKey = key
+        const rank = candidateKey === inputKey ? 0 : candidateKey.startsWith(inputKey) && candidateKey.length >= inputKey.length && candidateKey.length <= inputKey.length + 12 ? 1 : Infinity
+        if (rank < bestRank) { best = candidate; bestRank = rank }
+      }
+      if (fetcher === desktopHtmlFetch) {
+        if (zhNameCache.size >= 4000) zhNameCache.delete(zhNameCache.keys().next().value!)
+        zhNameCache.set(key, { at: Date.now(), hit: best })
+      }
+      return best
+    } catch {
+      return null
+    }
+  }
+  if (fetcher !== desktopHtmlFetch) return run()
+  const promise = run().finally(() => zhNamePending.delete(key))
+  zhNamePending.set(key, promise)
+  return promise
+}

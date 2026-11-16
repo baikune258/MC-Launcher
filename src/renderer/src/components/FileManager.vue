@@ -455,7 +455,7 @@ function toggleUpdateSelect(fileName: string, checked: boolean) {
               <path d="M14 2v6h6" />
             </svg>
           </span>
-          <span data-ui="FileManager:8c8c91106eaa" class="fm-name" tabindex="0" :title="e.name + ' · 按住拖到桌面或文件夹'" :draggable="!store.editMode && !batchBusy && !loading" @dragstart="dragResource($event, e)">{{ readableName(e) }}<small data-ui="FileManager:a0d9b4c442aa" v-if="readableName(e)!==e.name" class="fm-internal">{{e.name}}</small><small v-else-if="catalog[e.name]?.name && catalog[e.name].name!==e.name" class="fm-internal">{{catalog[e.name].name}}</small><small v-if="isDisabledMod(e)||catalog[e.name]?.locked" class="fm-internal">{{ [isDisabledMod(e)?'已禁用':'',catalog[e.name]?.locked?'已锁定':''].filter(Boolean).join(' · ') }}</small></span>
+          <span data-ui="FileManager:8c8c91106eaa" class="fm-name" tabindex="0" :title="e.name + ' · 按住拖到桌面或文件夹'" :draggable="!store.editMode && !batchBusy && !loading" @dragstart="dragResource($event, e)">{{ readableName(e) }}<small data-ui="FileManager:a0d9b4c442aa" v-if="readableName(e)!==e.name" class="fm-internal">{{e.name}}</small><small v-else-if="catalog[e.name]?.name && catalog[e.name].name!==e.name" class="fm-internal">{{catalog[e.name].name}}</small><small v-if="catalog[e.name]?.zhName" class="fm-internal fm-zh">{{catalog[e.name].zhName}}</small><small v-if="isDisabledMod(e)||catalog[e.name]?.locked" class="fm-internal">{{ [isDisabledMod(e)?'已禁用':'',catalog[e.name]?.locked?'已锁定':''].filter(Boolean).join(' · ') }}</small></span>
 
           <span data-ui="FileManager:558cc8ea9415" class="muted fm-meta">{{ e.isDir ? '文件夹' : fmtSize(e.size) }}</span>
           <span data-ui="FileManager:bf6ae194335f" class="muted fm-meta fm-date">{{ fmtDate(e.mtime) }}</span>

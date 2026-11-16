@@ -24,6 +24,7 @@ import { instanceDirectoryState } from './instances'
 import { getSettings } from './settings'
 import { MOD_ZH, chineseModSearchTerms, hasExactChineseModName } from './community-zh'
 import { lookupMcmod } from './mcmodSearch'
+import { enrichChineseNames } from './modZhNames'
 import { effectiveCommunityFilter, matchesCommunityFilter, usesCommunityLoader, MODRINTH_RESOURCE_LOADERS, type CommunityFileFilter } from '../../shared/communityPolicy'
 import { communityPageSlots } from './communityPaging'
 import { logScope } from './launcherLog'
@@ -339,15 +340,22 @@ function mapCfFiles(files: CfFile[], projectId: string): CommunityFile[] {
 
 // ---------------- 对外：搜索 / 文件列表 ----------------
 
-/** 给搜索结果标题加中文名前缀（slug 命中映射表时） */
-function withZhTitle(list: CommunityResult[]): CommunityResult[] {
-  return list.map((r) => {
-    const originalTitle = r.originalTitle ?? r.title
+/**
+ * 给搜索结果标题加中文名前缀：先查内置映射，未命中的再按英文名向 MC百科反查，
+ * 结果写入本地缓存（mod-zh-names.json），之后展示即时且不再联网。
+ * 补全有总预算，超时就先用已有中文名，不影响搜索本身的响应速度。
+ */
+async function withZhTitle(list: CommunityResult[]): Promise<CommunityResult[]> {
+  const original = list.map((r) => r.originalTitle ?? r.title)
+  const mapped = list.map((r, i) => {
     const zh = MOD_ZH[r.slug]
-    if (zh && !r.title.startsWith(zh) && !(r.originalTitle && r.title !== r.originalTitle)) {
-      return { ...r, originalTitle, title: `${zh} | ${r.title}` }
-    }
-    return { ...r, originalTitle }
+    return zh && !original[i].startsWith(zh) ? zh : undefined
+  })
+  const resolved = await enrichChineseNames(original.map((title, i) => ({ title, zh: mapped[i] })), 2_400)
+  return list.map((r, i) => {
+    const zh = resolved[i]
+    if (zh && !original[i].startsWith(zh)) return { ...r, originalTitle: original[i], title: `${zh} | ${original[i]}` }
+    return { ...r, originalTitle: original[i] }
   })
 }
 
@@ -476,7 +484,7 @@ export async function communitySearchPage(input: CommunityQuery): Promise<Commun
   }
   if (q.source !== 'all') {
     const page = await providerSearch(q.source, q)
-    return { ...page, items: withZhTitle(page.items) }
+    return { ...page, items: await withZhTitle(page.items) }
   }
   const sources: CommunitySource[] = ['modrinth', 'curseforge']
   const warnings: string[] = []
@@ -558,7 +566,7 @@ export async function communitySearchPage(input: CommunityQuery): Promise<Commun
     const item = page.items[slot.index - page.offset]
     return item ? [item] : []
   })
-  return { items: withZhTitle(items), total: totals.modrinth + totals.curseforge, offset: q.offset, limit: q.limit, warnings: [...new Set(warnings)] }
+  return { items: await withZhTitle(items), total: totals.modrinth + totals.curseforge, offset: q.offset, limit: q.limit, warnings: [...new Set(warnings)] }
 }
 
 import { favoriteIconUrl } from '../../shared/modFavorites'
