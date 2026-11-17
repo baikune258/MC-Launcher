@@ -175,6 +175,9 @@ export const instanceKey = (instance: Pick<InstalledVersion, 'id' | 'folder'>): 
 
 /** Explain the same semantic checks used for installation; never guess from labels. */
 export function modMismatchReasons(mod: ModInfo, instance: InstalledVersion): string[] {
+  // 语言加载器/库 jar（FMLModType: LIBRARY）本身不带加载器和版本范围，
+  // 安装进 mods 目录由 Forge 识别，不能因为「没有 mods.toml」被判不兼容。
+  if (mod.library) return []
   if (mod.error) return [mod.error]
   if (instance.failed || instance.incomplete) return ['实例安装不完整或元数据无法读取']
   const loader = normalizeLoader(instance.loader)

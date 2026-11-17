@@ -90,6 +90,24 @@ export function parseModArchive(zip: AdmZip, filePath: string, fileName: string,
         }
       }
     }
+    // Forge/NeoForge 的 language provider、shaded 库 jar 常常没有 mods.toml，
+    // 只在 MANIFEST 里声明 FMLModType: LIBRARY / GAMELIBRARY（如 Kotlin for Forge
+    // 的 -all jar）。这类文件是整合包正常前置，不能按「缺少元数据」判为坏包。
+    if (!records.length) {
+      const manifest = read('META-INF/MANIFEST.MF') ?? ''
+      const fmlType = /^FMLModType:\s*(LIBRARY|GAMELIBRARY)\b/im.exec(manifest)?.[1]?.toUpperCase()
+      if (fmlType) {
+        // 文件名去掉版本段即惯用 mod id（kotlinforforge-4.12.0-all.jar → kotlinforforge），
+        // 用它承担前置身份，避免依赖它的模组被判缺少前置。
+        const base = fileName.replace(/\.jar$/i, '').split(/-\d/)[0].replace(/[-_]+$/g, '') || fileName
+        const implementationVersion = /^Implementation-Version:\s*(.+)$/mi.exec(manifest)?.[1].trim() ?? ''
+        const version = implementationVersion || (/\.jar$/i.test(fileName) ? (fileName.match(/-(\d[\w.+-]*?)(?:-[a-z]+)?\.jar$/i)?.[1] ?? '') : '')
+        Object.assign(info, { id: base, name: base, version, loader: null, mcRange: '', library: true })
+        info.provides = [{ id: base, version }]
+        Object.assign(info, { dependencies: [] })
+        return info
+      }
+    }
     if (!records.length || !records[0].id) throw new Error('未找到有效的 MOD 元数据 / mod id')
     const first = records[0]
     Object.assign(info, first, { dependencies: first.requirements.map(d => d.id) })

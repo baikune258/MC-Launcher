@@ -1272,6 +1272,8 @@ export interface ModInfo {
   /** jar 文件绝对路径 */
   filePath: string
   fileName: string
+  /** 只声明 FMLModType: LIBRARY 的库 jar（无 mods.toml，如 Kotlin for Forge -all） */
+  library?: boolean
   /** 解析出的 mod id（失败为空） */
   id: string
   /** 展示名 */
